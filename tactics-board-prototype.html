@@ -1,0 +1,3556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TacticBoard Pro — Field Designer Prototype</title>
+<style>
+  :root{
+    --bg:#0b1220; --panel:#121a2b; --panel2:#0f1726; --border:#1f2c45;
+    --text:#e7ecf5; --muted:#8a97b3; --accent:#22c55e; --accent2:#3b82f6;
+    --teamA:#3b82f6; --teamANum:#08111f; --gkA:#eab308; --gkANum:#08111f;
+    --teamB:#ef4444; --teamBNum:#08111f; --gkB:#22c55e; --gkBNum:#08111f;
+    --pitch:#1e7a3d; --pitch2:#23984a;
+    --line:#f4f7fb; --warn:#f59e0b;
+  }
+  [data-theme="light"]{
+    --bg:#eef2f7; --panel:#ffffff; --panel2:#f6f8fb; --border:#dde4ef;
+    --text:#152033; --muted:#697186; --pitch:#3aa861; --pitch2:#46c074; --line:#ffffff;
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;}
+  body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;background:var(--bg);color:var(--text);overflow:hidden;}
+  #app{display:flex;flex-direction:column;height:100vh;}
+
+  /* TOP BAR */
+  header{display:flex;align-items:center;gap:14px;padding:8px 14px;background:var(--panel);border-bottom:1px solid var(--border);flex-wrap:wrap;z-index:5;}
+  .brand{font-weight:800;font-size:16px;letter-spacing:.5px;display:flex;align-items:center;gap:8px;}
+  .brand .dot{width:10px;height:10px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);}
+  .grp{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:4px;}
+  .grp button, .toolbtn{
+    border:none;background:transparent;color:var(--text);padding:6px 10px;border-radius:8px;cursor:pointer;font-size:12.5px;
+    display:flex;align-items:center;gap:6px;white-space:nowrap;transition:.12s;
+  }
+  .grp button:hover, .toolbtn:hover{background:var(--border);}
+  .grp button.active, .toolbtn.active{background:var(--accent);color:#08210f;font-weight:700;}
+  .spacer{flex:1;}
+  select, input[type=color]{background:var(--panel2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:5px 8px;font-size:12.5px;}
+  .icon{width:14px;height:14px;display:inline-block;}
+
+  /* MAIN LAYOUT */
+  main{display:flex;flex:1;min-height:0;}
+  aside{width:230px;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:10px;flex-shrink:0;}
+  aside.right{border-right:none;border-left:1px solid var(--border);}
+  .section-title{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:14px 0 8px;font-weight:700;}
+  .palette-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .palette-item{
+    border:1px solid var(--border);background:var(--panel2);border-radius:10px;padding:8px 6px;
+    display:flex;flex-direction:column;align-items:center;gap:4px;cursor:grab;font-size:11px;text-align:center;user-select:none;
+  }
+  .palette-item:hover{border-color:var(--accent);}
+  .token-preview{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:12px;border:2px solid #fff;}
+  .obj-preview{width:30px;height:30px;display:flex;align-items:center;justify-content:center;}
+
+  /* FIELD AREA */
+  .field-wrap{flex:1;position:relative;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at center,#0d2818 0%, var(--bg) 75%);overflow:hidden;perspective:1400px;}
+  [data-theme="light"] .field-wrap{background:radial-gradient(ellipse at center,#d9f2e1 0%, var(--bg) 75%);}
+  #fieldSvg{background:linear-gradient(180deg,var(--pitch),var(--pitch2));border-radius:6px;box-shadow:0 10px 40px rgba(0,0,0,.4);max-width:96%;max-height:96%;touch-action:none;transition:transform .45s ease, box-shadow .45s ease;}
+  .field-wrap.view3d{background:linear-gradient(180deg,#0a1730 0%, #142a1d 55%, var(--bg) 100%);}
+  .field-wrap.view3d #fieldSvg{transform-origin:50% 85%;box-shadow:0 40px 70px rgba(0,0,0,.65);}
+  .field-wrap.view3d::after{
+    content:'3D PREVIEW — adjustable broadcast camera';
+    position:absolute;top:10px;left:50%;transform:translateX(-50%);
+    font-size:11px;letter-spacing:.5px;color:rgba(255,255,255,.6);
+    background:rgba(0,0,0,.35);padding:4px 10px;border-radius:6px;pointer-events:none;
+  }
+  .camera-controls{display:none;align-items:center;gap:10px;}
+  .camera-controls.show{display:flex;}
+  .camera-controls label{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);white-space:nowrap;}
+  .camera-controls input[type="range"]{width:80px;}
+  .stripe{fill:rgba(255,255,255,0.035);}
+  .drop-target-active{outline:2px dashed var(--accent);outline-offset:-4px;}
+
+  /* BOTTOM TIMELINE */
+  footer{background:var(--panel);border-top:1px solid var(--border);padding:8px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .frames{display:flex;gap:6px;overflow-x:auto;max-width:50vw;padding:2px;}
+  .frame-btn{min-width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text);cursor:pointer;font-weight:700;font-size:12px;flex-shrink:0;}
+  .frame-btn.active{border-color:var(--accent);color:var(--accent);}
+  .frame-del{position:relative;}
+  .range{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);}
+  input[type=range]{width:100px;}
+
+  /* RIGHT PANEL */
+  .props label{display:block;font-size:11px;color:var(--muted);margin:8px 0 4px;}
+  .props input, .props select{width:100%;}
+  .swatches{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;align-items:center;}
+  .swatch{width:22px;height:22px;border-radius:50%;border:2px solid var(--border);cursor:pointer;}
+  .swatch.sel{border-color:var(--accent);}
+  input[type="color"].swatch-custom{width:28px;height:28px;border-radius:50%;border:2px solid var(--border);cursor:pointer;padding:0;background:none;-webkit-appearance:none;}
+  input[type="color"].swatch-custom::-webkit-color-swatch-wrapper{padding:0;border-radius:50%;}
+  input[type="color"].swatch-custom::-webkit-color-swatch{border:none;border-radius:50%;}
+  .curve-handle{cursor:grab;}
+  .curve-handle:active{cursor:grabbing;}
+  .lib-item{border:1px solid var(--border);border-radius:8px;padding:8px;margin-bottom:8px;background:var(--panel2);}
+  .lib-item .tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;}
+  .tag{font-size:9.5px;padding:2px 6px;border-radius:5px;background:var(--border);color:var(--muted);}
+  .hint{font-size:11px;color:var(--muted);line-height:1.5;padding:8px;background:var(--panel2);border:1px dashed var(--border);border-radius:8px;margin-top:10px;}
+  .badge{font-size:10px;background:var(--accent);color:#08210f;padding:1px 6px;border-radius:5px;font-weight:700;}
+
+  /* COLLAPSIBLE SIDEBAR SECTIONS */
+  details.sidebar-section{margin-bottom:2px;}
+  details.sidebar-section > summary{
+    font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);
+    margin:10px 0 8px;font-weight:700;cursor:pointer;list-style:none;
+    display:flex;align-items:center;justify-content:space-between;user-select:none;
+  }
+  details.sidebar-section > summary::-webkit-details-marker{display:none;}
+  details.sidebar-section > summary::after{content:'▸';font-size:10px;transition:transform .15s;}
+  details.sidebar-section[open] > summary::after{transform:rotate(90deg);}
+  details.sidebar-section > summary:hover{color:var(--text);}
+  details.sidebar-section > summary + *{margin-top:0;}
+
+  /* FIELD THEME */
+  .theme-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px;}
+  .theme-swatch{height:34px;border-radius:8px;border:1px solid var(--border);cursor:pointer;font-size:10.5px;font-weight:700;display:flex;align-items:center;justify-content:center;color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.6);}
+  .theme-swatch.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent);}
+  .field-theme-grass{background:linear-gradient(180deg,#1e7a3d,#23984a);}
+  .field-theme-bw{background:linear-gradient(180deg,#3a3a3a,#6b6b6b);}
+  .field-theme-metal{background:linear-gradient(180deg,#4b5563,#9ca3af);}
+  .line-color-row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin-bottom:8px;}
+  .line-color-row .spacer-sm{flex:1;}
+
+  /* CAMERA ANGLE (sidebar) */
+  .camera-controls-vert label{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);margin-bottom:10px;}
+  .camera-controls-vert input[type="range"]{width:100%;}
+
+  /* THICKNESS */
+  .thickness-row{display:flex;gap:6px;}
+  .thickness-row button{flex:1;flex-direction:column;gap:6px;padding:8px 4px;}
+  .thickness-bar{width:100%;height:3px;border-radius:2px;background:var(--text);}
+  .thickness-row button[data-thick="thin"] .thickness-bar{height:2px;}
+  .thickness-row button[data-thick="thick"] .thickness-bar{height:6px;}
+
+  /* TEAM COLORS */
+  .team-color-row{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;margin-bottom:8px;}
+  .team-side-label{font-size:11px;font-weight:800;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:10px 0 6px;}
+  .team-side-label:first-child{margin-top:0;}
+  .team-logo-row{display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px;}
+  .team-logo-row .logo-thumb{width:26px;height:26px;border-radius:6px;border:1px solid var(--border);background:var(--panel2);object-fit:cover;flex-shrink:0;}
+  .team-logo-row .logo-thumb.empty{display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);}
+  .team-logo-row label.upload-btn{flex:1;border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-size:11.5px;text-align:center;cursor:pointer;background:var(--panel2);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .team-logo-row label.upload-btn:hover{background:var(--border);}
+  .team-logo-row input[type="file"]{display:none;}
+  .team-color-divider{border:none;border-top:1px solid var(--border);margin:10px 0;}
+  .logo-slider-row{display:flex;flex-direction:column;gap:4px;font-size:11px;color:var(--muted);margin-bottom:8px;}
+  .logo-slider-row .slider-head{display:flex;justify-content:space-between;}
+  .logo-slider-row input[type="range"]{width:100%;}
+
+  /* FORMATIONS */
+  .formation-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+
+  /* PRESENTATION MODE — strip away every editing control so the board fills
+     the screen for showing to a group; only playback transport stays. */
+  body.presentation-mode header,
+  body.presentation-mode #leftPanel,
+  body.presentation-mode #rightPanel,
+  body.presentation-mode .edit-only{display:none !important;}
+  body.presentation-mode .field-wrap{background:#000;}
+  body.presentation-mode #fieldSvg{max-width:98%;max-height:98%;}
+  body.presentation-mode footer{justify-content:center;}
+  #exitPresentBtn{
+    display:none;position:fixed;top:14px;right:14px;z-index:50;
+    align-items:center;gap:6px;background:rgba(18,26,43,.85);color:#e7ecf5;
+    border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:8px 14px;
+    font-size:13px;cursor:pointer;backdrop-filter:blur(4px);
+  }
+  body.presentation-mode #exitPresentBtn{display:flex;}
+  #exitPresentBtn:hover{background:rgba(31,44,69,.95);}
+</style>
+</head>
+<body data-theme="dark">
+<div id="app">
+
+  <header>
+    <div class="brand"><span class="dot"></span> TacticBoard Pro <span class="badge">PROTOTYPE</span></div>
+
+    <div class="grp" id="fieldTypeGrp">
+      <button data-val="full" class="active">Full Field</button>
+      <button data-val="half">Half Field</button>
+    </div>
+
+    <div class="grp" id="orientGrp">
+      <button data-val="horizontal" class="active">Horizontal</button>
+      <button data-val="vertical">Vertical</button>
+    </div>
+
+    <div class="grp" id="viewGrp">
+      <button data-val="2d" class="active">2D View</button>
+      <button data-val="3d">3D View</button>
+    </div>
+
+    <div class="grp">
+      <button id="undoBtn" title="Undo (Ctrl+Z)">↶ Undo</button>
+      <button id="clearBtn" title="Clear all drawings from this frame">🗑 Clear</button>
+    </div>
+
+    <div class="grp">
+      <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;"><input type="checkbox" id="snapToggle" checked> Snap to grid</label>
+    </div>
+
+    <div class="spacer"></div>
+
+    <div class="grp">
+      <button id="themeToggle">🌙 Dark</button>
+    </div>
+    <div class="grp">
+      <select id="exportFormat">
+        <option value="png">PNG</option>
+        <option value="svg">SVG</option>
+        <option value="jpeg">JPEG</option>
+        <option value="video">Video (WebM)</option>
+      </select>
+      <button id="exportBtn">⬇ Export</button>
+    </div>
+    <div class="grp">
+      <button id="presentBtn" title="Show this board fullscreen to a group">🖥 Present</button>
+    </div>
+  </header>
+
+  <button id="exitPresentBtn" title="Exit presentation (Esc)">✕ Exit Presentation</button>
+
+  <main>
+    <!-- LEFT PALETTE -->
+    <aside id="leftPanel">
+      <details class="sidebar-section" open>
+        <summary>Field Theme</summary>
+        <div class="theme-row" id="fieldThemeGrid"></div>
+        <div class="line-color-row">
+          <span>Line Color</span>
+          <input type="color" id="lineColorPicker" class="swatch-custom" value="#f4f7fb">
+          <span class="spacer-sm"></span>
+          <button class="toolbtn" id="resetLineColorBtn" title="Reset line color" style="border:1px solid var(--border);">↺ Reset</button>
+        </div>
+        <div class="section-title" style="margin-top:10px;">Grass Pattern</div>
+        <div class="theme-row" id="stripePatternGrid"></div>
+        <button class="toolbtn" id="noLinesBtn" style="border:1px solid var(--border);width:100%;justify-content:center;">⊘ No Lines</button>
+      </details>
+
+      <details class="sidebar-section" open>
+        <summary>Camera Angle</summary>
+        <div class="camera-controls-vert" id="cameraControls">
+          <label>Tilt <input type="range" id="camTilt" min="20" max="65" step="1" value="42"></label>
+          <label>Rotate <input type="range" id="camRotate" min="-15" max="15" step="1" value="0"></label>
+          <label>Zoom <input type="range" id="camZoom" min="0.8" max="1.6" step="0.02" value="1.18"></label>
+        </div>
+        <div class="hint" style="margin-top:0;">Camera angle affects the 3D view and 3D export.</div>
+      </details>
+
+      <details class="sidebar-section" open>
+        <summary>Drawing Tools</summary>
+        <div class="palette-grid" id="toolGrid"></div>
+        <div class="section-title" style="margin-top:10px;">Thickness</div>
+        <div class="thickness-row" id="thicknessGrid"></div>
+      </details>
+
+      <details class="sidebar-section" open>
+        <summary>Players</summary>
+        <div class="palette-grid" id="playerGrid"></div>
+        <div class="section-title" style="margin-top:10px;">Multi-Select</div>
+        <button class="toolbtn" id="multiSelectBtn" style="width:100%;">▭ Select Multiple &amp; Move</button>
+        <div class="hint" id="multiSelectHint" style="display:none;margin-top:6px;">Click players to add/remove from the selection, then drag any selected player to move the whole group. Press Esc or the button again to clear.</div>
+      </details>
+
+      <details class="sidebar-section" open>
+        <summary>Tactical Objects</summary>
+        <div class="palette-grid" id="objectGrid"></div>
+      </details>
+
+      <details class="sidebar-section">
+        <summary>Team Colors</summary>
+        <div id="teamColorsGrid"></div>
+      </details>
+
+      <details class="sidebar-section">
+        <summary>Ad Banner</summary>
+        <label style="font-size:12px;display:flex;align-items:center;gap:5px;cursor:pointer;margin-bottom:8px;">
+          <input type="checkbox" id="adBannerEnable"> Show advertising banner
+        </label>
+        <div id="adBannerOptions" style="display:none;">
+          <div class="theme-row" style="grid-template-columns:1fr 1fr;">
+            <button class="toolbtn" id="adBannerModeText" style="border:1px solid var(--border);">Text</button>
+            <button class="toolbtn" id="adBannerModeImage" style="border:1px solid var(--border);">Image</button>
+          </div>
+          <div id="adBannerTextOptions">
+            <div class="section-title" style="margin-top:10px;">Banner Text</div>
+            <input type="text" id="adBannerText" placeholder="YOUR SPONSOR HERE" maxlength="60" style="width:100%;box-sizing:border-box;padding:6px 8px;border-radius:8px;border:1px solid var(--border);background:var(--panel2);color:var(--text);font-size:12px;margin-bottom:8px;">
+          </div>
+          <div id="adBannerImageOptions" style="display:none;">
+            <div class="section-title" style="margin-top:10px;">Banner Image</div>
+            <div class="team-logo-row">
+              <div class="logo-thumb empty" id="adBannerImageThumb">🖼</div>
+              <label class="upload-btn">+ Upload Image
+                <input type="file" id="adBannerImageInput" accept="image/*">
+              </label>
+              <button class="toolbtn" id="adBannerImageRemove" style="border:1px solid var(--border);display:none;">✕</button>
+            </div>
+          </div>
+          <div class="line-color-row">
+            <span>Background</span>
+            <input type="color" id="adBannerBgColor" class="swatch-custom" value="#0d1b2a">
+            <span class="spacer-sm"></span>
+            <span id="adBannerTextColorLabel">Text</span>
+            <input type="color" id="adBannerTextColor" class="swatch-custom" value="#ffffff">
+          </div>
+        </div>
+        <div class="hint">Adds a toggleable sponsor banner around the pitch edge — write your own scrolling text, or upload an image to tile around the border. Visible in 2D view and 2D exports (hidden in 3D view).</div>
+      </details>
+
+      <div class="hint">Drag items onto the pitch. Click a drawing tool, then drag on the pitch to draw. Double-click a player to edit its number.</div>
+    </aside>
+
+    <!-- FIELD -->
+    <div class="field-wrap">
+      <svg id="fieldSvg" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowHead" markerWidth="10" markerHeight="10" refX="6" refY="3" orient="auto" markerUnits="strokeWidth">
+            <path d="M0,0 L6,3 L0,6 Z" fill="context-stroke"/>
+          </marker>
+          <linearGradient id="pitchGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="var(--pitch)"/>
+            <stop offset="1" stop-color="var(--pitch2)"/>
+          </linearGradient>
+          <filter id="dropShadow3d" x="-50%" y="-50%" width="200%" height="200%">
+            <feDropShadow dx="2.5" dy="3.5" stdDeviation="1.4" flood-color="#000000" flood-opacity="0.45"/>
+          </filter>
+          <clipPath id="playerClip">
+            <circle r="14"/>
+          </clipPath>
+          <radialGradient id="ballShade" cx="35%" cy="30%" r="75%">
+            <stop offset="0" stop-color="#ffffff" stop-opacity="0.9"/>
+            <stop offset="55%" stop-color="#ffffff" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#000000" stop-opacity="0.25"/>
+          </radialGradient>
+        </defs>
+        <g id="pitchLayer"></g>
+        <g id="drawLayer"></g>
+        <g id="unitLinkLayer"></g>
+        <g id="objectLayer"></g>
+        <g id="previewLayer"></g>
+        <g id="bannerLayer"></g>
+      </svg>
+    </div>
+
+    <!-- RIGHT PANEL -->
+    <aside class="right" id="rightPanel">
+      <details class="sidebar-section" open>
+        <summary>Properties</summary>
+        <div class="props" id="propsPanel">
+          <div class="hint">Select an object or drawing on the pitch to edit its properties.</div>
+        </div>
+      </details>
+
+      <details class="sidebar-section">
+        <summary>Formation — Home</summary>
+        <div class="formation-grid" id="formationHomeGrid"></div>
+      </details>
+
+      <details class="sidebar-section">
+        <summary>Formation — Away</summary>
+        <div class="formation-grid" id="formationAwayGrid"></div>
+      </details>
+
+      <details class="sidebar-section">
+        <summary>Session Library</summary>
+        <div id="libraryList"></div>
+        <button class="toolbtn" id="saveTemplateBtn" style="border:1px solid var(--border);width:100%;justify-content:center;">＋ Save current play as template</button>
+      </details>
+    </aside>
+  </main>
+
+  <!-- TIMELINE / ANIMATION -->
+  <footer>
+    <div class="grp">
+      <button id="playBtn">▶ Play</button>
+      <button id="pauseBtn">⏸ Pause</button>
+      <button id="stepBackBtn">⏮ Step</button>
+      <button id="stepFwdBtn">⏭ Step</button>
+    </div>
+    <div class="range">
+      Speed
+      <input type="range" id="speedRange" min="0.25" max="3" step="0.25" value="1">
+      <span id="speedLabel">1x</span>
+    </div>
+    <div class="frames" id="frameList"></div>
+    <div class="grp edit-only">
+      <button id="addFrameBtn">＋ Duplicate Frame</button>
+      <button id="delFrameBtn">🗑 Delete Frame</button>
+    </div>
+    <div class="spacer"></div>
+    <div style="font-size:11px;color:var(--muted);">Frame <span id="frameLabel">1</span> / <span id="frameCount">1</span></div>
+  </footer>
+
+</div>
+
+<script>
+/* =========================================================================
+   TacticBoard Pro — Field Designer Prototype
+   Single-file demo of the core field designer: pitch rendering (2D, full &
+   half, horizontal & vertical), drag/drop players & tactical objects,
+   drawing tools, multi-frame plays with timeline + playback, undo/redo,
+   snap-to-grid, and PNG/SVG export. 3D mode is a placeholder visualization.
+   ========================================================================= */
+
+const svg = document.getElementById('fieldSvg');
+const fieldWrap = document.querySelector('.field-wrap');
+const pitchLayer = document.getElementById('pitchLayer');
+const unitLinkLayer = document.getElementById('unitLinkLayer');
+const objectLayer = document.getElementById('objectLayer');
+const drawLayer = document.getElementById('drawLayer');
+const previewLayer = document.getElementById('previewLayer');
+const bannerLayer = document.getElementById('bannerLayer');
+
+// Drawing color palette, used for the Properties panel's color swatches
+// (per-drawing color and the global default draw color). Roughly grouped:
+// neutrals, warm tones, pinks/purples, blues, greens/teals.
+const COLORS = [
+  '#ffffff','#000000','#9ca3af','#64748b',
+  '#facc15','#f59e0b','#fb923c','#ef4444','#dc2626',
+  '#ec4899','#f472b6','#a855f7','#8b5cf6',
+  '#3b82f6','#0ea5e9','#06b6d4','#1e3a8a',
+  '#22c55e','#84cc16','#14b8a6',
+];
+
+// FIELD THEMES — pitch gradient + default line color for each preset.
+// Applied as inline CSS custom properties on <body>, which take priority
+// over the [data-theme] attribute rules so the chosen theme persists across
+// light/dark mode toggles.
+const FIELD_THEMES = {
+  grass:   { label:'Grass',    pitch:'#1e7a3d', pitch2:'#23984a', line:'#f4f7fb' },
+  bw:      { label:'B&W',      pitch:'#4b4b4b', pitch2:'#7a7a7a', line:'#ffffff' },
+  metal:   { label:'Metal',    pitch:'#566173', pitch2:'#9aa4b2', line:'#101521' },
+  orange:  { label:'Orange',   pitch:'#c2410c', pitch2:'#ea580c', line:'#ffffff' },
+  navy:    { label:'Navy',     pitch:'#0b1e3f', pitch2:'#1e3a6e', line:'#ffffff' },
+  crimson: { label:'Crimson',  pitch:'#7f1d1d', pitch2:'#b91c1c', line:'#ffffff' },
+  purple:  { label:'Purple',   pitch:'#4c1d95', pitch2:'#6d28d9', line:'#ffffff' },
+  ice:     { label:'Ice Blue', pitch:'#3b82f6', pitch2:'#60a5fa', line:'#0b1e3f' },
+  clay:    { label:'Clay',     pitch:'#9a3412', pitch2:'#c2703a', line:'#fff7ed' },
+  white:   { label:'White',    pitch:'#f5f5f5', pitch2:'#ffffff', line:'#1f2937' },
+};
+
+// "Grass" mowing patterns rendered as subtle highlight stripes/rings over the
+// pitch surface. Rect-based patterns (vertical/horizontal/checker) are
+// expressed as a list of {x,y,w,h} rectangles in the 1050x680 base marking
+// space; 'rings' is a list of concentric ring bands around the kickoff spot;
+// 'none' draws nothing.
+const STRIPE_PATTERNS = {
+  vertical:   { label:'Vertical' },
+  horizontal: { label:'Horizontal' },
+  checker:    { label:'Checker' },
+  rings:      { label:'Rings' },
+  none:       { label:'None' },
+};
+
+function stripeRects(){
+  const pattern = state.stripePattern || 'vertical';
+  const rects = [];
+  if(pattern==='vertical'){
+    const colW = 1050/11;
+    for(let i=0;i<11;i++) if(i%2===0) rects.push({x:i*colW, y:0, w:colW, h:680});
+  } else if(pattern==='horizontal'){
+    const rowH = 680/8;
+    for(let i=0;i<8;i++) if(i%2===0) rects.push({x:0, y:i*rowH, w:1050, h:rowH});
+  } else if(pattern==='checker'){
+    const cols=10, rows=6;
+    const colW=1050/cols, rowH=680/rows;
+    for(let r=0;r<rows;r++){
+      for(let c=0;c<cols;c++){
+        if((r+c)%2===0) rects.push({x:c*colW, y:r*rowH, w:colW, h:rowH});
+      }
+    }
+  }
+  return rects;
+}
+
+function stripeRings(){
+  if((state.stripePattern||'vertical')!=='rings') return [];
+  const cx=525, cy=340;
+  const maxR = Math.hypot(525,340);
+  const step = maxR/6;
+  const rings = [];
+  for(let i=0;i<6;i++){
+    if(i%2===0) rings.push({cx,cy, r: step*(i+0.5), strokeWidth: step});
+  }
+  return rings;
+}
+
+// Stroke thickness presets (px) for drawings.
+const THICKNESS_PRESETS = [
+  { id:'thin', label:'Thin', value:2 },
+  { id:'medium', label:'Medium', value:3 },
+  { id:'thick', label:'Thick', value:5 },
+];
+function thicknessId(value){
+  if(value<=2) return 'thin';
+  if(value>=5) return 'thick';
+  return 'medium';
+}
+
+// Applies the current field theme (pitch gradient colors + line color) as
+// inline CSS custom properties on <body>. Called on theme change, line-color
+// change, and at init.
+function applyFieldTheme(){
+  const theme = FIELD_THEMES[state.fieldTheme] || FIELD_THEMES.grass;
+  document.body.style.setProperty('--pitch', theme.pitch);
+  document.body.style.setProperty('--pitch2', theme.pitch2);
+  document.body.style.setProperty('--line', state.lineColor || theme.line);
+}
+
+// Applies custom team/GK jersey + number colors (or clears overrides back
+// to the theme defaults) as inline CSS custom properties on <body>.
+const TEAM_COLOR_CSS_VARS = {
+  A: { jersey:'--teamA', number:'--teamANum', gk:'--gkA', gkNumber:'--gkANum' },
+  B: { jersey:'--teamB', number:'--teamBNum', gk:'--gkB', gkNumber:'--gkBNum' },
+};
+function applyTeamColors(){
+  ['A','B'].forEach(team=>{
+    const fields = TEAM_COLOR_CSS_VARS[team];
+    Object.keys(fields).forEach(field=>{
+      const cssVar = fields[field];
+      const val = state.teamColors[team] && state.teamColors[team][field];
+      if(val) document.body.style.setProperty(cssVar, val);
+      else document.body.style.removeProperty(cssVar);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
+// STATE
+// ---------------------------------------------------------------------
+const state = {
+  fieldType: 'full',      // full | half
+  orientation: 'horizontal', // horizontal | vertical
+  view3d: false,
+  // Adjustable "broadcast camera" for the 3D view — tilt (pitch angle),
+  // rotate (camera pan/orbit), and zoom. Drives both the CSS preview
+  // transform and the keystone projection used for 3D exports.
+  camera: { tilt: 42, rotate: 0, zoom: 1.18 },
+  theme: 'dark',
+  tool: 'select',
+  drawColor: '#facc15',
+  snap: true,
+  selectedId: null,
+  // Multi-Select & Move (Players tab): ids of objects (usually players)
+  // currently selected as a group. Populated while state.tool==='multiSelect'.
+  multiSelectIds: [],
+  frames: [ { objects: [], drawings: [] } ],
+  currentFrame: 0,
+  playing: false,
+  speed: 1,
+  // FIELD THEME — see FIELD_THEMES for the full list (grass, b&w, metal,
+  // orange, navy, crimson, purple, ice blue, clay, ...). lineColor:null means
+  // "use the theme's default line color"; once the user picks a custom color
+  // it overrides the theme default until reset. noLines hides all pitch
+  // markings. stripePattern controls the mowed-grass highlight pattern — see
+  // STRIPE_PATTERNS (vertical, horizontal, checker, rings, none).
+  fieldTheme: 'grass',
+  lineColor: null,
+  noLines: false,
+  stripePattern: 'vertical',
+  // Default stroke thickness (px) applied to newly created drawings.
+  // Per-drawing overrides are stored on the drawing object as `thickness`.
+  strokeThickness: 3,
+  // Custom team colors — per team (A=Home, B=Away): jersey, number text color,
+  // GK jersey, and GK number text color. null = use theme default.
+  teamColors: {
+    A: { jersey: null, number: null, gk: null, gkNumber: null },
+    B: { jersey: null, number: null, gk: null, gkNumber: null },
+  },
+  // Club logo/badge data-URLs rendered inside player circle markers.
+  teamLogos: { A: null, B: null },
+  // Opacity (0..1) applied to team logo badges inside player circles.
+  playerLogoOpacity: 1,
+  // Field images: zero or more logo/badge data-URL watermarks rendered
+  // beneath the pitch markings. Each entry is
+  // {id, src, x, y, size, opacity, locked} where x/y are fractions of the
+  // pitch viewBox (0,0 = top-left corner, 1,1 = bottom-right corner; default
+  // 0.5/0.5 = centered), size is a fraction of min(pitchWidth,pitchHeight),
+  // opacity is 0..1, and locked (when true) prevents dragging in Select mode.
+  fieldImages: [],
+  // Ad Banner: toggleable advertising border drawn around the pitch edge
+  // (top/bottom/left/right bands), for sponsor text or a tiled image.
+  // mode: 'text' | 'image'. Only rendered in 2D view/exports — see
+  // getBorderSize(), which forces it off while state.view3d is true.
+  adBanner: {
+    enabled: false,
+    mode: 'text',
+    text: 'YOUR SPONSOR HERE',
+    bgColor: '#0d1b2a',
+    textColor: '#ffffff',
+    image: null,
+  },
+};
+let library = [];
+let history = [];
+let historyIndex = -1;
+
+function snapshot(){
+  const clone = JSON.parse(JSON.stringify({frames: state.frames, currentFrame: state.currentFrame}));
+  history = history.slice(0, historyIndex+1);
+  history.push(clone);
+  historyIndex = history.length-1;
+  if(history.length > 100){ history.shift(); historyIndex--; }
+}
+function undo(){
+  if(historyIndex <= 0) return;
+  historyIndex--;
+  restore(history[historyIndex]);
+}
+function redo(){
+  if(historyIndex >= history.length-1) return;
+  historyIndex++;
+  restore(history[historyIndex]);
+}
+// Clear all drawings (arrows, zones, labels, unit links, etc.) from the
+// current frame. Players and tactical objects are left in place. Confirms
+// first since this can't be undone via the button itself (though Ctrl+Z
+// still works afterward).
+function clearFrame(){
+  const f = currentFrame();
+  if(f.drawings.length===0) return;
+  if(!confirm('Clear all drawings from this frame?')) return;
+  f.drawings = [];
+  state.selectedId = null;
+  unitLinkFrom = null;
+  snapshot();
+  render();
+}
+function restore(snap){
+  state.frames = JSON.parse(JSON.stringify(snap.frames));
+  state.currentFrame = snap.currentFrame;
+  render();
+}
+
+function currentFrame(){ return state.frames[state.currentFrame]; }
+
+// ---------------------------------------------------------------------
+// VIEWBOX / PITCH MARKINGS
+// Base coordinate space = horizontal full field, 105m x 68m -> 1050 x 680
+// ---------------------------------------------------------------------
+function getViewBox(){
+  if(state.orientation === 'horizontal'){
+    return state.fieldType === 'full' ? [0,0,1050,680] : [0,0,525,680];
+  } else {
+    // Keep vy at 0 for both full and half vertical fields so every
+    // fraction<->pixel conversion (fx*w, pt.y/h, etc.) across the file
+    // works without needing a vy offset. getPitchTransform() below
+    // compensates by rotating the base pitch markings into the correct
+    // half-field band instead.
+    return state.fieldType === 'full' ? [0,0,680,1050] : [0,0,680,525];
+  }
+}
+function getPitchTransform(){
+  if(state.orientation !== 'vertical') return '';
+  // Rotates the 1050x680 base-space pitch markings into vertical space.
+  // For the full field that's a 680x1050 space (baseY=1050); for the half
+  // field, getViewBox() above returns a 680x525 space with vy=0, so the
+  // rotation must land markings in [0,525] instead of [525,1050] -
+  // baseY=525 shifts them up by the same 525 that the viewBox shifted by.
+  const baseY = state.fieldType === 'half' ? 525 : 1050;
+  return `matrix(0,-1,1,0,0,${baseY})`;
+}
+
+// ---------------------------------------------------------------------
+// AD BANNER (sponsor border around the pitch)
+// The pitch's own coordinate space, getViewBox() => [x,y,w,h], is left
+// completely unchanged so every existing fx/fy <-> pixel conversion keeps
+// working. The ad banner is purely an additive margin `b` drawn around that
+// box; the SVG's actual viewBox grows to [x-b,y-b,w+2b,h+2b] to make room.
+// Disabled in 3D view/export (see note on state.adBanner) since the CSS
+// perspective transform + the 3D export's from-scratch scene rebuild don't
+// account for the extra margin.
+// ---------------------------------------------------------------------
+function getBorderSize(w,h){
+  if(!state.adBanner || !state.adBanner.enabled || state.view3d) return 0;
+  return Math.round(Math.min(w,h)*0.07);
+}
+function getOuterViewBox(){
+  const [x,y,w,h] = getViewBox();
+  const b = getBorderSize(w,h);
+  return [x-b, y-b, w+2*b, h+2*b];
+}
+function escapeXml(str){
+  return String(str==null?'':str).replace(/[<>&'"]/g, c=>({'<':'&lt;','>':'&gt;','&':'&amp;',"'":'&apos;','"':'&quot;'}[c]));
+}
+// Builds the markup for bannerLayer: four bands (top/bottom/left/right) in
+// the margin `b` around the pitch box [x,y,w,h]. In 'image' mode the
+// uploaded image is tiled across each band via an SVG pattern; in 'text'
+// mode a repeated, stretched sponsor string fills each band like an LED
+// perimeter board.
+function buildAdBannerHTML(x,y,w,h,b){
+  if(b<=0) return '';
+  const ab = state.adBanner;
+  const bg = ab.bgColor || '#0d1b2a';
+  const fg = ab.textColor || '#ffffff';
+  const bands = [
+    {x:x-b, y:y-b, w:w+2*b, h:b, rot:0},   // top
+    {x:x-b, y:y+h,  w:w+2*b, h:b, rot:0},   // bottom
+    {x:x-b, y:y,    w:b, h:h, rot:-90},     // left
+    {x:x+w, y:y,    w:b, h:h, rot:90},      // right
+  ];
+  let out = '';
+  let fillAttr = `fill="${bg}"`;
+  if(ab.mode==='image' && ab.image){
+    // Tile the uploaded image as a repeating pattern across each band. Tile
+    // width is a multiple of the band thickness so the image isn't squished
+    // to a sliver; preserveAspectRatio="slice" crops to fill each tile.
+    const tileW = b*3;
+    out += `<pattern id="adBannerPattern" x="${x-b}" y="${y-b}" width="${tileW}" height="${b}" patternUnits="userSpaceOnUse"><rect width="${tileW}" height="${b}" fill="${bg}"/><image href="${ab.image}" x="0" y="0" width="${tileW}" height="${b}" preserveAspectRatio="xMidYMid slice"/></pattern>`;
+    fillAttr = `fill="url(#adBannerPattern)"`;
+  }
+  // Font size scales with the border thickness; charAdvance is a rough
+  // average glyph-advance estimate for bold sans-serif at this size, used to
+  // pick how many repeats of "TEXT  •  " are needed to cover each band
+  // BEFORE any textLength adjustment. Sizing the repeat count this way (so
+  // the natural text is already close to the target length) keeps the
+  // textLength stretch/compress factor near 1 — the previous fixed repeat
+  // count produced a natural width several times the target, which
+  // "spacingAndGlyphs" then squashed into an unreadable, crushed blob.
+  const fontSize = b*0.46;
+  const charAdvance = fontSize*0.58;
+  bands.forEach((band,i)=>{
+    out += `<rect x="${band.x}" y="${band.y}" width="${band.w}" height="${band.h}" ${fillAttr}/>`;
+    if(ab.mode==='text'){
+      const txt = (ab.text||'').trim() || 'YOUR SPONSOR HERE';
+      const unit = `${txt}    •    `;
+      const len = band.rot===0 ? band.w : band.h;
+      const unitWidth = unit.length*charAdvance;
+      let reps = Math.max(1, Math.round(len/unitWidth));
+      while(reps*unitWidth < len && reps < 40) reps++;
+      const full = unit.repeat(reps);
+      const cx = band.x+band.w/2, cy = band.y+band.h/2;
+      const transform = band.rot ? ` transform="rotate(${band.rot} ${cx} ${cy})"` : '';
+      const clipId = `adBannerClip_${i}`;
+      out += `<clipPath id="${clipId}"><rect x="${band.x}" y="${band.y}" width="${band.w}" height="${band.h}"/></clipPath>`;
+      out += `<text x="${cx}" y="${cy}" clip-path="url(#${clipId})"${transform} fill="${fg}" font-family="Arial, Helvetica, sans-serif" font-weight="700" font-size="${fontSize.toFixed(2)}" text-anchor="middle" dominant-baseline="central" textLength="${(len*0.98).toFixed(2)}" lengthAdjust="spacing">${escapeXml(full)}</text>`;
+    }
+  });
+  return out;
+}
+
+function buildPitchMarkings(){
+  const L = (x1,y1,x2,y2,extra='') => `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="var(--line)" stroke-width="2" ${extra}/>`;
+  const R = (x,y,w,h) => `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  const C = (cx,cy,r,fill='none') => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fill}" stroke="var(--line)" stroke-width="2"/>`;
+  let out = '';
+  // mowed-grass stripes/rings (always shown, even with "No Lines" enabled)
+  stripeRects().forEach(r=>{
+    out += `<rect class="stripe" fill="rgba(255,255,255,0.035)" x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}"/>`;
+  });
+  stripeRings().forEach(ring=>{
+    out += `<circle class="stripe" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="${ring.strokeWidth}" cx="${ring.cx}" cy="${ring.cy}" r="${ring.r}"/>`;
+  });
+  // "No Lines" hides all pitch markings (boundary, halfway line, circles,
+  // boxes, goals, corner arcs) for a clean canvas to draw on.
+  if(state.noLines) return out;
+  // boundary
+  out += R(2,2,1046,676);
+  // halfway line
+  out += L(525,2,525,678);
+  // center circle + spot
+  out += C(525,340,91.5);
+  out += C(525,340,2,'var(--line)');
+  // penalty areas
+  out += R(2,138.4,165,403.2);
+  out += R(883,138.4,165,403.2);
+  // 6-yard boxes
+  out += R(2,248.4,55,183.2);
+  out += R(993,248.4,55,183.2);
+  // penalty spots
+  out += C(110,340,2,'var(--line)');
+  out += C(940,340,2,'var(--line)');
+  // penalty arcs
+  out += `<path d="M167,266.9 A91.5,91.5 0 0 1 167,413.1" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  out += `<path d="M883,413.1 A91.5,91.5 0 0 1 883,266.9" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  // goals
+  out += `<rect x="-18" y="303.4" width="18" height="73.2" fill="none" stroke="var(--line)" stroke-width="3"/>`;
+  out += `<rect x="1050" y="303.4" width="18" height="73.2" fill="none" stroke="var(--line)" stroke-width="3"/>`;
+  // corner arcs
+  out += `<path d="M2,12 A10,10 0 0 1 12,2" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  out += `<path d="M1038,2 A10,10 0 0 1 1048,12" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  out += `<path d="M1048,668 A10,10 0 0 1 1038,678" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  out += `<path d="M12,678 A10,10 0 0 1 2,668" fill="none" stroke="var(--line)" stroke-width="2"/>`;
+  return out;
+}
+
+// ---------------------------------------------------------------------
+// PALETTE DEFINITIONS
+// ---------------------------------------------------------------------
+const TOOLS = [
+  {id:'select', label:'Select / Move', icon:'↖'},
+  {id:'highlightPlayer', label:'Highlight Player', icon:'★'},
+  {id:'ruler', label:'Ruler', icon:'📏'},
+  {id:'arrow', label:'Arrow', icon:'→'},
+  {id:'dashedArrow', label:'Dashed Move', icon:'⇢'},
+  {id:'curveArrow', label:'Curved Run', icon:'↝'},
+  {id:'loftedPass', label:'Lofted Pass', icon:'⤴'},
+  {id:'passLine', label:'Passing Line', icon:'┄'},
+  {id:'unitLink', label:'Unit Link', icon:'⊙'},
+  {id:'zone', label:'Highlight Zone', icon:'▭'},
+  {id:'circleZone', label:'Highlight Circle', icon:'◯'},
+  {id:'triangleZone', label:'Triangle Zone', icon:'△'},
+  {id:'angleZone', label:'Angle Zone', icon:'◖'},
+  {id:'polygon', label:'Polygon', icon:'⬠'},
+  {id:'text', label:'Label', icon:'A'},
+  {id:'eraser', label:'Eraser', icon:'✕'},
+];
+
+let teamACounter = 1, teamBCounter = 1;
+
+function makeObject(type, extra={}){
+  return Object.assign({
+    id: 'o'+Math.random().toString(36).slice(2,9),
+    type, fx:0.5, fy:0.5
+  }, extra);
+}
+
+const PLAYER_ITEMS = [
+  {label:'Team A Player', build:()=>makeObject('player',{team:'A', number: teamACounter<=11?teamACounter++:1})},
+  {label:'Team B Player', build:()=>makeObject('player',{team:'B', number: teamBCounter<=11?teamBCounter++:1})},
+  {label:'Goalkeeper A', build:()=>makeObject('player',{team:'A', number:1, gk:true})},
+  {label:'Goalkeeper B', build:()=>makeObject('player',{team:'B', number:1, gk:true})},
+  {label:'Custom Marker', build:()=>makeObject('player',{team:'C', number:'?', custom:true})},
+  {label:'Position Label', build:()=>makeObject('posLabel',{text:'CB'})},
+];
+
+const OBJECT_ITEMS = [
+  {label:'Cone', build:()=>makeObject('cone')},
+  {label:'Pole', build:()=>makeObject('pole')},
+  {label:'Mannequin', build:()=>makeObject('mannequin')},
+  {label:'Gate', build:()=>makeObject('gate')},
+  {label:'Mini Goal', build:()=>makeObject('minigoal')},
+  {label:'Full Goal', build:()=>makeObject('fullgoal')},
+  {label:'Obstacle', build:()=>makeObject('obstacle')},
+  {label:'Ball', build:()=>makeObject('ball')},
+];
+
+// ---------------------------------------------------------------------
+// BUILD LEFT PALETTE UI
+// ---------------------------------------------------------------------
+function renderPalette(){
+  const toolGrid = document.getElementById('toolGrid');
+  toolGrid.innerHTML='';
+  TOOLS.forEach(t=>{
+    const d = document.createElement('div');
+    d.className='palette-item toolbtn'+(state.tool===t.id?' active':'');
+    d.style.cursor='pointer';
+    d.innerHTML = `<div class="token-preview" style="background:transparent;border:1px solid var(--border);font-size:16px;">${t.icon}</div><span>${t.label}</span>`;
+    d.onclick=()=>{
+      if(state.tool==='polygon' && t.id!=='polygon') cancelPolygon();
+      if(state.tool==='multiSelect') state.multiSelectIds=[];
+      state.tool=t.id;
+      if(unitLinkFrom){ unitLinkFrom=null; previewLayer.innerHTML=''; renderObjects(); }
+      renderPalette();
+      renderObjects();
+    };
+    toolGrid.appendChild(d);
+  });
+
+  // Multi-Select & Move (Players tab) button reflects whether the
+  // multiSelect tool is currently active.
+  const msBtn = document.getElementById('multiSelectBtn');
+  if(msBtn){
+    msBtn.classList.toggle('active', state.tool==='multiSelect');
+    const hint = document.getElementById('multiSelectHint');
+    if(hint) hint.style.display = state.tool==='multiSelect' ? 'block' : 'none';
+  }
+
+  const playerGrid = document.getElementById('playerGrid');
+  playerGrid.innerHTML='';
+  PLAYER_ITEMS.forEach((p,idx)=>{
+    const d = document.createElement('div');
+    d.className='palette-item';
+    let bg = '#64748b', label='?';
+    if(p.label.includes('Team A')){bg='var(--teamA)';label='A';}
+    if(p.label.includes('Team B')){bg='var(--teamB)';label='B';}
+    if(p.label.includes('Goalkeeper A')){bg='var(--gkA)';label='GK';}
+    if(p.label.includes('Goalkeeper B')){bg='var(--gkB)';label='GK';}
+    if(p.label.includes('Custom')){bg='#a855f7';label='?';}
+    if(p.label.includes('Position')){bg='transparent';label='CB';}
+    d.innerHTML = p.label.includes('Position')
+      ? `<div class="token-preview" style="background:transparent;border:1px dashed var(--border);color:var(--text);">${label}</div><span>${p.label}</span>`
+      : `<div class="token-preview" style="background:${bg};color:#08111f;">${label}</div><span>${p.label}</span>`;
+    setupPaletteDrag(d, ()=>PLAYER_ITEMS[idx].build());
+    playerGrid.appendChild(d);
+  });
+
+  const objectGrid = document.getElementById('objectGrid');
+  objectGrid.innerHTML='';
+  const icons = {Cone:'🔶',Pole:'📍',Mannequin:'🧍',Gate:'⛩',['Mini Goal']:'🥅',['Full Goal']:'🥅',Obstacle:'✕',Ball:'⚽'};
+  OBJECT_ITEMS.forEach((o,idx)=>{
+    const d = document.createElement('div');
+    d.className='palette-item';
+    d.innerHTML = `<div class="obj-preview" style="font-size:18px;">${icons[o.label]||'▪'}</div><span>${o.label}</span>`;
+    setupPaletteDrag(d, ()=>OBJECT_ITEMS[idx].build());
+    objectGrid.appendChild(d);
+  });
+}
+
+// ---------------------------------------------------------------------
+// PALETTE -> FIELD PLACEMENT (Pointer Events drag, plus tap-to-add)
+// Native HTML5 drag-and-drop is unreliable in embedded/sandboxed views and
+// on touch devices, so palette items use the same Pointer Events pattern
+// as in-field object dragging (see startDragObject below).
+// ---------------------------------------------------------------------
+function setupPaletteDrag(el, build){
+  el.style.cursor = 'grab';
+  let ghost = null, dragging = false, startX=0, startY=0;
+
+  el.addEventListener('pointerdown', e=>{
+    if(e.button!==undefined && e.button!==0) return;
+    dragging = false;
+    startX = e.clientX; startY = e.clientY;
+    el.setPointerCapture && el.setPointerCapture(e.pointerId);
+
+    const onMove = ev=>{
+      if(!dragging){
+        if(Math.abs(ev.clientX-startX) < 4 && Math.abs(ev.clientY-startY) < 4) return;
+        dragging = true;
+        ghost = document.createElement('div');
+        ghost.className = 'palette-drag-ghost';
+        Object.assign(ghost.style, {
+          position:'fixed', left:'0', top:'0', width:'34px', height:'34px',
+          borderRadius:'50%', background:'var(--accent)', opacity:'0.65',
+          pointerEvents:'none', zIndex:'9999', transform:'translate(-9999px,-9999px)',
+          boxShadow:'0 4px 12px rgba(0,0,0,.4)'
+        });
+        document.body.appendChild(ghost);
+      }
+      ghost.style.transform = `translate(${ev.clientX-17}px, ${ev.clientY-17}px)`;
+      const rect = svg.getBoundingClientRect();
+      const over = ev.clientX>=rect.left && ev.clientX<=rect.right && ev.clientY>=rect.top && ev.clientY<=rect.bottom;
+      fieldWrap.classList.toggle('drop-target-active', over);
+    };
+
+    const onUp = ev=>{
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', onUp);
+      el.releasePointerCapture && e.pointerId!=null && el.releasePointerCapture(e.pointerId);
+      fieldWrap.classList.remove('drop-target-active');
+      if(ghost){ ghost.remove(); ghost = null; }
+
+      const rect = svg.getBoundingClientRect();
+      const inField = ev.clientX>=rect.left && ev.clientX<=rect.right && ev.clientY>=rect.top && ev.clientY<=rect.bottom;
+      if(dragging && !inField) return; // dropped outside the pitch
+
+      const [,,w,h] = getViewBox();
+      const pt = inField ? screenToSvg(ev.clientX, ev.clientY) : {x:w/2, y:h/2};
+      const obj = build();
+      obj.fx = pt.x/w; obj.fy = pt.y/h;
+      applySnap(obj);
+      currentFrame().objects.push(obj);
+      snapshot(); render();
+    };
+
+    document.addEventListener('pointermove', onMove);
+    document.addEventListener('pointerup', onUp);
+  });
+}
+
+// ---------------------------------------------------------------------
+// RENDER FIELD + OBJECTS + DRAWINGS
+// ---------------------------------------------------------------------
+function render(){
+  const [x,y,w,h] = getViewBox();
+  const b = getBorderSize(w,h);
+  const ox = x-b, oy = y-b, ow = w+2*b, oh = h+2*b;
+  svg.setAttribute('viewBox', `${ox} ${oy} ${ow} ${oh}`);
+  // keep a sensible on-screen size
+  const maxW = 900, maxH = 620;
+  let dispW, dispH;
+  if(ow/oh > maxW/maxH){ dispW = Math.min(maxW, ow); dispH = dispW*oh/ow; }
+  else { dispH = Math.min(maxH, oh); dispW = dispH*ow/oh; }
+  svg.setAttribute('width', dispW);
+  svg.setAttribute('height', dispH);
+
+  bannerLayer.innerHTML = buildAdBannerHTML(x,y,w,h,b);
+
+  // Field images: low-opacity watermark(s) on the pitch, drawn above the
+  // grass fill but beneath the line markings. Each is independently
+  // positioned/sized/styled and draggable in Select mode unless locked.
+  let fieldLogoHTML = '';
+  if(state.fieldImages && state.fieldImages.length){
+    fieldLogoHTML = state.fieldImages.map(img=>{
+      const sizeFrac = img.size!=null ? img.size : 0.32;
+      const opacity = img.opacity!=null ? img.opacity : 0.28;
+      const size = Math.min(w,h)*sizeFrac;
+      const lx = img.x!=null ? img.x : 0.5;
+      const ly = img.y!=null ? img.y : 0.5;
+      const cursor = (state.tool==='select' && !img.locked) ? 'move' : 'default';
+      return `<image id="fieldImg_${img.id}" href="${img.src}" x="${x+w*lx-size/2}" y="${y+h*ly-size/2}" width="${size}" height="${size}" opacity="${opacity}" preserveAspectRatio="xMidYMid meet" style="cursor:${cursor};"/>`;
+    }).join('');
+  }
+  pitchLayer.innerHTML = `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="url(#pitchGrad)"/>${fieldLogoHTML}<g transform="${getPitchTransform()}">${buildPitchMarkings()}</g>`;
+
+  fieldWrap.classList.toggle('view3d', !!state.view3d);
+  applyCameraTransform();
+
+  renderObjects();
+  renderDrawings();
+  updatePropsPanel();
+  renderFrameList();
+  document.getElementById('frameLabel').textContent = state.currentFrame+1;
+  document.getElementById('frameCount').textContent = state.frames.length;
+}
+
+function teamColor(team, gk){
+  if(gk) return team==='B' ? 'var(--gkB)' : 'var(--gkA)';
+  if(team==='A') return 'var(--teamA)';
+  if(team==='B') return 'var(--teamB)';
+  return '#a855f7';
+}
+
+// Text/number color that sits on top of teamColor() — independently
+// customizable via the TEAM COLORS panel (Number Color / GK Number).
+function numberColor(team, gk){
+  if(gk) return team==='B' ? 'var(--gkBNum)' : 'var(--gkANum)';
+  if(team==='A') return 'var(--teamANum)';
+  if(team==='B') return 'var(--teamBNum)';
+  return '#08111f';
+}
+
+function objectGroupHTML(o){
+  if(o.type==='player'){
+    const r=14;
+    const logo = (o.team==='A'||o.team==='B') ? state.teamLogos[o.team] : null;
+    const logoOpacity = state.playerLogoOpacity!=null ? state.playerLogoOpacity : 1;
+    // Highlight Player tool: a glowing gold ring drawn behind the player
+    // marker, persistent across moves/frames until toggled off.
+    const highlight = o.highlighted ? `
+        <circle r="${r+8}" fill="rgba(250,204,21,0.28)" stroke="#fbbf24" stroke-width="3"/>` : '';
+    // When a team logo/badge is shown inside the marker, the jersey number
+    // is drawn large and bold directly over the crest with a white outline
+    // (paint-order: stroke before fill) so it stays crisp and legible
+    // against any crest artwork, without hiding the badge underneath.
+    const numberStyle = logo
+      ? `font-size="16" stroke="#ffffff" stroke-width="3" stroke-linejoin="round" paint-order="stroke" fill="${numberColor(o.team,o.gk)}"`
+      : `font-size="13" fill="${numberColor(o.team,o.gk)}"`;
+    return `
+        ${highlight}
+        <circle r="${r}" fill="${teamColor(o.team,o.gk)}" stroke="#fff" stroke-width="2"/>
+        ${logo?`<image href="${logo}" x="${-r}" y="${-r}" width="${r*2}" height="${r*2}" clip-path="url(#playerClip)" preserveAspectRatio="xMidYMid slice" opacity="${logoOpacity}"/>`:''}
+        <text y="5" text-anchor="middle" font-weight="800" font-family="sans-serif" ${numberStyle}>${o.number}</text>
+        ${o.label?`<text y="${r+14}" text-anchor="middle" font-size="11" fill="var(--line)" font-family="sans-serif">${o.label}</text>`:''}
+      `;
+  } else if(o.type==='posLabel'){
+    return `<rect x="-16" y="-12" width="32" height="24" rx="5" fill="rgba(0,0,0,0.35)" stroke="var(--line)" stroke-dasharray="3,2"/>
+        <text y="5" text-anchor="middle" font-size="12" font-weight="700" fill="var(--line)" font-family="sans-serif">${o.text}</text>`;
+  } else if(o.type==='cone'){
+    return `<path d="M0,-12 L9,10 L-9,10 Z" fill="#fb923c" stroke="#7c2d12" stroke-width="1.5"/>`;
+  } else if(o.type==='pole'){
+    return `<rect x="-2" y="-14" width="4" height="28" fill="#fde047"/><circle r="3" cy="14" fill="#1f2937"/>`;
+  } else if(o.type==='mannequin'){
+    return `<circle cy="-9" r="5" fill="#cbd5e1"/><rect x="-7" y="-4" width="14" height="16" rx="3" fill="#94a3b8"/>`;
+  } else if(o.type==='gate'){
+    return `<rect x="-16" y="-14" width="4" height="28" fill="#fde047"/><rect x="12" y="-14" width="4" height="28" fill="#fde047"/><line x1="-14" y1="0" x2="14" y2="0" stroke="#fde047" stroke-width="2" stroke-dasharray="2,2"/>`;
+  } else if(o.type==='minigoal'){
+    return `<rect x="-14" y="-9" width="28" height="18" fill="none" stroke="var(--line)" stroke-width="3"/><rect x="-14" y="-9" width="28" height="18" fill="rgba(255,255,255,0.15)"/>`;
+  } else if(o.type==='fullgoal'){
+    return `<rect x="-22" y="-13" width="44" height="26" fill="none" stroke="var(--line)" stroke-width="4"/><rect x="-22" y="-13" width="44" height="26" fill="rgba(255,255,255,0.12)"/>`;
+  } else if(o.type==='obstacle'){
+    return `<line x1="-9" y1="-9" x2="9" y2="9" stroke="#ef4444" stroke-width="4"/><line x1="9" y1="-9" x2="-9" y2="9" stroke="#ef4444" stroke-width="4"/>`;
+  } else if(o.type==='ball'){
+    // Classic black/white pentagon-and-seam pattern, with a radial highlight
+    // to give the marker a spherical, "soccer ball" look rather than a flat dot.
+    const patch = `<path d="M-1.7,-6.2 L1.7,-6.2 L1,-7.9 L-1,-7.9 Z"/>`;
+    const seam = `<line x1="0" y1="-3" x2="0" y2="-6.2"/>`;
+    return `
+        <circle r="8" fill="#f7f7f5" stroke="#1f2937" stroke-width="1"/>
+        <g fill="#1f2937">
+          <path d="M0,-3 L2.85,-0.93 L1.76,2.43 L-1.76,2.43 L-2.85,-0.93 Z"/>
+          <g>${patch}</g>
+          <g transform="rotate(72)">${patch}</g>
+          <g transform="rotate(144)">${patch}</g>
+          <g transform="rotate(216)">${patch}</g>
+          <g transform="rotate(288)">${patch}</g>
+        </g>
+        <g stroke="#1f2937" stroke-width="0.6" fill="none">
+          ${seam}
+          <g transform="rotate(72)">${seam}</g>
+          <g transform="rotate(144)">${seam}</g>
+          <g transform="rotate(216)">${seam}</g>
+          <g transform="rotate(288)">${seam}</g>
+        </g>
+        <circle r="8" fill="url(#ballShade)"/>
+      `;
+  }
+  return '';
+}
+
+function renderObjects(){
+  objectLayer.innerHTML='';
+  const [,,w,h] = getViewBox();
+  currentFrame().objects.forEach(o=>{
+    const cx = o.fx*w, cy = o.fy*h;
+    const g = document.createElementNS('http://www.w3.org/2000/svg','g');
+    g.setAttribute('data-id', o.id);
+    g.setAttribute('transform', `translate(${cx},${cy})`);
+    g.style.cursor='grab';
+    g.classList.add('obj');
+    if(state.selectedId===o.id) g.classList.add('selected');
+    g.innerHTML = objectGroupHTML(o);
+
+    // Unit Link tool: highlight the first-clicked player with a dashed ring
+    // while waiting for the second player to be clicked.
+    if(state.tool==='unitLink' && o.id===unitLinkFrom){
+      const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ring.setAttribute('r','20');
+      ring.setAttribute('fill','none');
+      ring.setAttribute('stroke','#facc15');
+      ring.setAttribute('stroke-width','3');
+      ring.setAttribute('stroke-dasharray','4,3');
+      ring.setAttribute('opacity','0.9');
+      g.appendChild(ring);
+    }
+
+    // Multi-Select & Move (Players tab): a solid accent ring around every
+    // object currently included in the group selection.
+    if(state.tool==='multiSelect' && state.multiSelectIds.includes(o.id)){
+      const ring = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      ring.setAttribute('r','19');
+      ring.setAttribute('fill','none');
+      ring.setAttribute('stroke','var(--accent)');
+      ring.setAttribute('stroke-width','3');
+      ring.setAttribute('opacity','0.9');
+      g.appendChild(ring);
+    }
+
+    g.addEventListener('pointerdown', e=>startDragObject(e,o));
+    if(o.type==='player'){
+      g.addEventListener('dblclick', e=>{
+        const n = prompt('Edit number / label', o.number);
+        if(n!==null){ o.number=n; snapshot(); render(); }
+      });
+    }
+    objectLayer.appendChild(g);
+  });
+}
+
+function renderDrawings(){
+  drawLayer.innerHTML='';
+  unitLinkLayer.innerHTML='';
+  previewLayer.innerHTML='';
+  const [,,w,h] = getViewBox();
+  currentFrame().drawings.forEach(d=>{
+    const el = drawingToSVG(d,w,h);
+    el.setAttribute('data-id', d.id);
+    el.style.cursor='pointer';
+    if(state.selectedId===d.id) el.setAttribute('stroke-opacity','1');
+    el.addEventListener('pointerdown', e=>{
+      if(state.tool==='eraser'){
+        currentFrame().drawings = currentFrame().drawings.filter(x=>x.id!==d.id);
+        snapshot(); render();
+        e.stopPropagation();
+        return;
+      }
+      e.stopPropagation();
+      state.selectedId = d.id;
+      updatePropsPanel();
+      // Allow picking up and moving an already-drawn shape with the Select
+      // tool. Unit Link connectors follow their linked players instead, so
+      // they aren't draggable as a whole.
+      if(state.tool==='select' && d.type!=='unitLink'){
+        const pt = screenToSvg(e.clientX, e.clientY);
+        const [,,vw,vh] = getViewBox();
+        draggingDrawing = d;
+        dragDrawingLast = {x: pt.x/vw, y: pt.y/vh};
+        svg.setPointerCapture(e.pointerId);
+      }
+      renderDrawings();
+    });
+    // Unit Link connectors render beneath the player markers so they read as
+    // a grouping under the squad, not an arrow drawn over the top of them.
+    (d.type==='unitLink' ? unitLinkLayer : drawLayer).appendChild(el);
+
+    // Curved Run / Lofted Pass drawings get a draggable handle on their
+    // control point so the curve/arc shape can be edited once selected.
+    // These guides/handles go in previewLayer (top-most) rather than
+    // drawLayer so they stay clickable even though drawings now render
+    // beneath the player markers.
+    if((d.type==='curveArrow'||d.type==='loftedPass') && state.selectedId===d.id && state.tool==='select'){
+      const ctl = (d.cx!=null && d.cy!=null) ? {cx:d.cx, cy:d.cy} : (d.type==='loftedPass' ? defaultLoftControl(d) : defaultCurveControl(d));
+      const ns='http://www.w3.org/2000/svg';
+      const guide = document.createElementNS(ns,'line');
+      guide.setAttribute('x1', d.x1*w); guide.setAttribute('y1', d.y1*h);
+      guide.setAttribute('x2', ctl.cx*w); guide.setAttribute('y2', ctl.cy*h);
+      guide.setAttribute('stroke','var(--accent)'); guide.setAttribute('stroke-width','1');
+      guide.setAttribute('stroke-dasharray','3,3'); guide.setAttribute('opacity','0.5');
+      previewLayer.appendChild(guide);
+      const guide2 = document.createElementNS(ns,'line');
+      guide2.setAttribute('x1', d.x2*w); guide2.setAttribute('y1', d.y2*h);
+      guide2.setAttribute('x2', ctl.cx*w); guide2.setAttribute('y2', ctl.cy*h);
+      guide2.setAttribute('stroke','var(--accent)'); guide2.setAttribute('stroke-width','1');
+      guide2.setAttribute('stroke-dasharray','3,3'); guide2.setAttribute('opacity','0.5');
+      previewLayer.appendChild(guide2);
+
+      const handle = document.createElementNS(ns,'circle');
+      handle.setAttribute('cx', ctl.cx*w); handle.setAttribute('cy', ctl.cy*h);
+      handle.setAttribute('r', 7);
+      handle.setAttribute('fill','var(--accent)');
+      handle.setAttribute('stroke','#ffffff'); handle.setAttribute('stroke-width','2');
+      handle.classList.add('curve-handle');
+      handle.addEventListener('pointerdown', e=>{
+        e.stopPropagation();
+        draggingCurveHandle = d;
+        svg.setPointerCapture(e.pointerId);
+      });
+      previewLayer.appendChild(handle);
+    }
+  });
+}
+
+// Lighten/darken a #rrggbb color by a percentage (-1..1). Returns the input
+// unchanged if it isn't a 6-digit hex color (e.g. var(--x) at export time).
+function shadeColor(hex, percent){
+  if(typeof hex!=='string' || !/^#[0-9a-fA-F]{6}$/.test(hex)) return hex;
+  const num = parseInt(hex.slice(1),16);
+  let r=(num>>16)&0xFF, g=(num>>8)&0xFF, b=num&0xFF;
+  r = Math.round(r + (percent>=0 ? (255-r) : r)*percent);
+  g = Math.round(g + (percent>=0 ? (255-g) : g)*percent);
+  b = Math.round(b + (percent>=0 ? (255-b) : b)*percent);
+  r=Math.min(255,Math.max(0,r)); g=Math.min(255,Math.max(0,g)); b=Math.min(255,Math.max(0,b));
+  return '#'+[r,g,b].map(v=>v.toString(16).padStart(2,'0')).join('');
+}
+
+// Default curve control point (as fractions of the field), perpendicular to
+// the start->end line. Curves persist a custom cx/cy once dragged.
+function defaultCurveControl(d){
+  const dx=d.x2-d.x1, dy=d.y2-d.y1;
+  const nx=-dy, ny=dx;
+  const len=Math.hypot(nx,ny)||1;
+  const off=Math.hypot(dx,dy)*0.25;
+  return { cx: (d.x1+d.x2)/2 + nx/len*off, cy: (d.y1+d.y2)/2 + ny/len*off };
+}
+
+// Default lofted-pass apex (as fractions of the field): the midpoint of the
+// start->end line, raised "upward" on screen to suggest the ball arcing into
+// the air. Persists a custom cx/cy once the apex handle is dragged.
+function defaultLoftControl(d){
+  const dx=d.x2-d.x1, dy=d.y2-d.y1;
+  const dist=Math.hypot(dx,dy);
+  return { cx:(d.x1+d.x2)/2, cy:(d.y1+d.y2)/2 - dist*0.4 };
+}
+
+// Renders the "telestrator" style lofted-pass arrow: a thick chevron-dashed
+// line (team color base + white dash overlay) finished with a bold
+// triangular arrowhead, following a quadratic-bezier path. Shared between
+// the live 2D renderer and the 3D export renderer.
+function loftedPassSVG(x1,y1,x2,y2,cx,cy,color,baseWidth){
+  baseWidth = baseWidth || 11;
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  g.setAttribute('filter','url(#dropShadow3d)');
+  const pathStr = `M${x1},${y1} Q${cx},${cy} ${x2},${y2}`;
+
+  // thick colored base stroke
+  const base = document.createElementNS(ns,'path');
+  base.setAttribute('d',pathStr);
+  base.setAttribute('fill','none');
+  base.setAttribute('stroke', color);
+  base.setAttribute('stroke-width',baseWidth);
+  base.setAttribute('stroke-linecap','butt');
+  g.appendChild(base);
+
+  // white dash overlay creates the chevron/candy-cane broadcast look
+  const dash = document.createElementNS(ns,'path');
+  dash.setAttribute('d',pathStr);
+  dash.setAttribute('fill','none');
+  dash.setAttribute('stroke','#ffffff');
+  dash.setAttribute('stroke-width',baseWidth);
+  dash.setAttribute('stroke-linecap','butt');
+  dash.setAttribute('stroke-dasharray', `${baseWidth*1.64},${baseWidth*1.64}`);
+  g.appendChild(dash);
+
+  // bold triangular arrowhead, tangent to the curve at its endpoint
+  // (tangent of a quadratic bezier at t=1 points along (x2-cx, y2-cy))
+  const angle = Math.atan2(y2-cy, x2-cx);
+  const size = baseWidth*2.18, spread = 0.46;
+  const bx1 = x2 - size*Math.cos(angle-spread), by1 = y2 - size*Math.sin(angle-spread);
+  const bx2 = x2 - size*Math.cos(angle+spread), by2 = y2 - size*Math.sin(angle+spread);
+  const head = document.createElementNS(ns,'polygon');
+  head.setAttribute('points', `${x2},${y2} ${bx1},${by1} ${bx2},${by2}`);
+  head.setAttribute('fill','#ffffff');
+  head.setAttribute('stroke', color);
+  head.setAttribute('stroke-width','2');
+  head.setAttribute('stroke-linejoin','round');
+  g.appendChild(head);
+
+  return g;
+}
+
+// Unit Link drawings connect two player objects by id, so the link follows
+// the players as they move between frames/positions rather than staying
+// fixed at the coordinates where it was drawn. Returns pixel-space endpoint
+// coordinates for the current frame, or null if either linked player no
+// longer exists. Falls back to fixed x1/y1/x2/y2 for any legacy links.
+function unitLinkEndpoints(d, w, h){
+  if(d.fromId && d.toId){
+    const objs = currentFrame().objects;
+    const o1 = objs.find(o=>o.id===d.fromId);
+    const o2 = objs.find(o=>o.id===d.toId);
+    if(!o1 || !o2) return null;
+    return {x1:o1.fx*w, y1:o1.fy*h, x2:o2.fx*w, y2:o2.fy*h};
+  }
+  if(d.x1!=null && d.y1!=null && d.x2!=null && d.y2!=null){
+    return {x1:d.x1*w, y1:d.y1*h, x2:d.x2*w, y2:d.y2*h};
+  }
+  return null;
+}
+
+// Renders the "Unit Link" connector: a thick line between two players with
+// ring highlights around each endpoint, grouping them into a tactical unit
+// (matches broadcast-graphic "3-2 AT BASE" style grouping). rx/ry pairs let
+// the 3D export draw ellipses for the projected ring shapes.
+function unitLinkSVG(x1,y1,x2,y2,color,rx1,ry1,rx2,ry2,lineWidth,ringWidth){
+  lineWidth = lineWidth || 7;
+  ringWidth = ringWidth || 3.5;
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  g.setAttribute('filter','url(#dropShadow3d)');
+
+  const line = document.createElementNS(ns,'line');
+  line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+  line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width',lineWidth);
+  line.setAttribute('stroke-linecap','round');
+  line.setAttribute('opacity','0.95');
+  g.appendChild(line);
+
+  const hi = document.createElementNS(ns,'line');
+  hi.setAttribute('x1',x1); hi.setAttribute('y1',y1-1);
+  hi.setAttribute('x2',x2); hi.setAttribute('y2',y2-1);
+  hi.setAttribute('stroke', shadeColor(color,0.5));
+  hi.setAttribute('stroke-width','1.5');
+  hi.setAttribute('stroke-linecap','round');
+  hi.setAttribute('opacity','0.6');
+  g.appendChild(hi);
+
+  [[x1,y1,rx1,ry1],[x2,y2,rx2,ry2]].forEach(([cx,cy,rx,ry])=>{
+    const ring = document.createElementNS(ns,'ellipse');
+    ring.setAttribute('cx',cx); ring.setAttribute('cy',cy);
+    ring.setAttribute('rx',rx); ring.setAttribute('ry',ry);
+    ring.setAttribute('fill','none');
+    ring.setAttribute('stroke', color);
+    ring.setAttribute('stroke-width',ringWidth);
+    g.appendChild(ring);
+  });
+
+  return g;
+}
+
+// Renders the "Angle Zone" cone/wedge highlight: a pie-slice from the apex
+// (x1,y1) toward the direction point (x2,y2), spanning `angleDeg` degrees
+// centered on that direction, with a degree label near the arc. Points are
+// generated in field-space and passed through `proj` (identity for the 2D
+// renderer, the keystone projector for the 3D renderer) so the wedge follows
+// the camera perspective in 3D exports.
+function angleZoneSVG(ox,oy,dx,dy,angleDeg,color,thickness,proj){
+  proj = proj || ((x,y)=>({x,y,s:1}));
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  g.setAttribute('filter','url(#dropShadow3d)');
+  const r = Math.hypot(dx-ox, dy-oy) || 1;
+  const baseAngle = Math.atan2(dy-oy, dx-ox);
+  const span = (angleDeg||90) * Math.PI/180;
+  const n = Math.max(6, Math.round(Math.abs(angleDeg||90)/8));
+  const pts = [];
+  for(let i=0;i<=n;i++){
+    const a = baseAngle - span/2 + span*(i/n);
+    pts.push(proj(ox + r*Math.cos(a), oy + r*Math.sin(a)));
+  }
+  const apexP = proj(ox,oy);
+  const fmt = p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', `M${fmt(apexP)} L${pts.map(fmt).join(' L')} Z`);
+  path.setAttribute('fill', color);
+  path.setAttribute('fill-opacity','0.22');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', thickness||2);
+  path.setAttribute('stroke-linejoin','round');
+  g.appendChild(path);
+  return g;
+}
+
+// Ruler: a dashed measuring line with end ticks and a live distance label.
+// The pitch is 1050 x 680 svg units = 105m x 68m, so 1 svg unit = 0.1m
+// regardless of orientation/field-type (both dimensions share that scale).
+const PITCH_UNITS_PER_METER = 10;
+function rulerSVG(x1,y1,x2,y2,color,thickness,proj){
+  proj = proj || ((x,y)=>({x,y,s:1}));
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  g.setAttribute('filter','url(#dropShadow3d)');
+  const p1 = proj(x1,y1), p2 = proj(x2,y2);
+  const line = document.createElementNS(ns,'line');
+  line.setAttribute('x1',p1.x.toFixed(2)); line.setAttribute('y1',p1.y.toFixed(2));
+  line.setAttribute('x2',p2.x.toFixed(2)); line.setAttribute('y2',p2.y.toFixed(2));
+  line.setAttribute('stroke', color);
+  line.setAttribute('stroke-width', thickness||3);
+  line.setAttribute('stroke-dasharray','6,4');
+  line.setAttribute('stroke-linecap','round');
+  g.appendChild(line);
+  const ang = Math.atan2(p2.y-p1.y, p2.x-p1.x);
+  const tickLen = 8;
+  [p1,p2].forEach(p=>{
+    const tick = document.createElementNS(ns,'line');
+    tick.setAttribute('x1',(p.x + tickLen*Math.cos(ang+Math.PI/2)).toFixed(2));
+    tick.setAttribute('y1',(p.y + tickLen*Math.sin(ang+Math.PI/2)).toFixed(2));
+    tick.setAttribute('x2',(p.x - tickLen*Math.cos(ang+Math.PI/2)).toFixed(2));
+    tick.setAttribute('y2',(p.y - tickLen*Math.sin(ang+Math.PI/2)).toFixed(2));
+    tick.setAttribute('stroke', color);
+    tick.setAttribute('stroke-width', thickness||3);
+    g.appendChild(tick);
+  });
+  const distM = Math.hypot(x2-x1, y2-y1) / PITCH_UNITS_PER_METER;
+  const mx = (p1.x+p2.x)/2, my=(p1.y+p2.y)/2;
+  const text = document.createElementNS(ns,'text');
+  text.setAttribute('x', mx.toFixed(2));
+  text.setAttribute('y', (my-8).toFixed(2));
+  text.setAttribute('text-anchor','middle');
+  text.setAttribute('font-size', (15*(p1.s!=null?p1.s:1)).toFixed(1));
+  text.setAttribute('font-weight','700');
+  text.setAttribute('font-family','sans-serif');
+  text.setAttribute('fill', color);
+  text.textContent = `${distM.toFixed(1)}m`;
+  g.appendChild(text);
+  return g;
+}
+
+// Triangle Zone: a translucent triangular highlight, with the two drawn
+// points forming the base corners and an apex centered above (or below,
+// depending on drag direction) the bounding box.
+function triangleZoneSVG(x1,y1,x2,y2,color,thickness,proj){
+  proj = proj || ((x,y)=>({x,y,s:1}));
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  g.setAttribute('filter','url(#dropShadow3d)');
+  const minX=Math.min(x1,x2), maxX=Math.max(x1,x2);
+  const minY=Math.min(y1,y2), maxY=Math.max(y1,y2);
+  const pts = [
+    proj((minX+maxX)/2, minY),
+    proj(minX, maxY),
+    proj(maxX, maxY),
+  ];
+  const fmt = p=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', `M${fmt(pts[0])} L${fmt(pts[1])} L${fmt(pts[2])} Z`);
+  path.setAttribute('fill', color);
+  path.setAttribute('fill-opacity','0.22');
+  path.setAttribute('stroke', color);
+  path.setAttribute('stroke-width', thickness||2);
+  path.setAttribute('stroke-linejoin','round');
+  g.appendChild(path);
+  return g;
+}
+
+function drawingToSVG(d,w,h){
+  const ns='http://www.w3.org/2000/svg';
+  const x1=d.x1*w, y1=d.y1*h, x2=d.x2*w, y2=d.y2*h;
+  const tk = d.thickness || 3;       // line stroke width for arrows/curves
+  const tkScale = tk/3;              // scale factor for elements with non-3 base widths
+  if(d.type==='arrow'||d.type==='dashedArrow'||d.type==='passLine'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    line.setAttribute('stroke', d.color);
+    line.setAttribute('stroke-width', tk);
+    line.setAttribute('stroke-linecap','round');
+    if(d.type!=='arrow') line.setAttribute('stroke-dasharray', d.type==='passLine'?'2,4':'8,6');
+    if(d.type!=='passLine') line.setAttribute('marker-end','url(#arrowHead)');
+    g.appendChild(line);
+    // glossy highlight on top edge for a rounded "3D tube" look
+    const hi = document.createElementNS(ns,'line');
+    hi.setAttribute('x1',x1); hi.setAttribute('y1',y1-1);
+    hi.setAttribute('x2',x2); hi.setAttribute('y2',y2-1);
+    hi.setAttribute('stroke', shadeColor(d.color,0.55));
+    hi.setAttribute('stroke-width', 1);
+    hi.setAttribute('stroke-linecap','round');
+    hi.setAttribute('opacity','0.7');
+    if(d.type!=='arrow') hi.setAttribute('stroke-dasharray', d.type==='passLine'?'2,4':'8,6');
+    g.appendChild(hi);
+    return g;
+  }
+  if(d.type==='curveArrow'){
+    const ctl = (d.cx!=null && d.cy!=null) ? {cx:d.cx, cy:d.cy} : defaultCurveControl(d);
+    const cx=ctl.cx*w, cy=ctl.cy*h;
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d',`M${x1},${y1} Q${cx},${cy} ${x2},${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', d.color);
+    path.setAttribute('stroke-width', tk);
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('stroke-dasharray','6,5');
+    path.setAttribute('marker-end','url(#arrowHead)');
+    g.appendChild(path);
+    const hi = document.createElementNS(ns,'path');
+    hi.setAttribute('d',`M${x1},${y1-1} Q${cx},${cy-1} ${x2},${y2-1}`);
+    hi.setAttribute('fill','none');
+    hi.setAttribute('stroke', shadeColor(d.color,0.55));
+    hi.setAttribute('stroke-width', 1);
+    hi.setAttribute('stroke-linecap','round');
+    hi.setAttribute('stroke-dasharray','6,5');
+    hi.setAttribute('opacity','0.7');
+    g.appendChild(hi);
+    return g;
+  }
+  if(d.type==='loftedPass'){
+    const ctl = (d.cx!=null && d.cy!=null) ? {cx:d.cx, cy:d.cy} : defaultLoftControl(d);
+    return loftedPassSVG(x1,y1,x2,y2,ctl.cx*w,ctl.cy*h,d.color,11*tkScale);
+  }
+  if(d.type==='unitLink'){
+    const pts = unitLinkEndpoints(d,w,h);
+    if(!pts) return document.createElementNS(ns,'g');
+    return unitLinkSVG(pts.x1,pts.y1,pts.x2,pts.y2,d.color,27,27,27,27,7*tkScale,3.5*tkScale);
+  }
+  if(d.type==='angleZone'){
+    const angleDeg = d.angle!=null ? d.angle : 90;
+    return angleZoneSVG(x1,y1,x2,y2,angleDeg,d.color,tk);
+  }
+  if(d.type==='ruler'){
+    return rulerSVG(x1,y1,x2,y2,d.color,tk);
+  }
+  if(d.type==='triangleZone'){
+    return triangleZoneSVG(x1,y1,x2,y2,d.color,tk);
+  }
+  if(d.type==='zone'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const rect = document.createElementNS(ns,'rect');
+    rect.setAttribute('x',Math.min(x1,x2)); rect.setAttribute('y',Math.min(y1,y2));
+    rect.setAttribute('width',Math.abs(x2-x1)); rect.setAttribute('height',Math.abs(y2-y1));
+    rect.setAttribute('fill',d.color); rect.setAttribute('fill-opacity','0.25');
+    rect.setAttribute('stroke',d.color); rect.setAttribute('stroke-width',tk);
+    g.appendChild(rect);
+    return g;
+  }
+  if(d.type==='circleZone'){
+    const r = Math.hypot(x2-x1,y2-y1);
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx',x1); c.setAttribute('cy',y1); c.setAttribute('r',r);
+    c.setAttribute('fill',d.color); c.setAttribute('fill-opacity','0.18');
+    c.setAttribute('stroke',d.color); c.setAttribute('stroke-width',tk);
+    g.appendChild(c);
+    return g;
+  }
+  if(d.type==='text'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const t = document.createElementNS(ns,'text');
+    t.setAttribute('x',x1); t.setAttribute('y',y1);
+    t.setAttribute('fill',d.color); t.setAttribute('font-size','22'); t.setAttribute('font-weight','700');
+    t.setAttribute('font-family','sans-serif');
+    t.textContent = d.text || 'Label';
+    g.appendChild(t);
+    return g;
+  }
+  if(d.type==='polygon'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const pts = (d.points||[]).map(p=>`${p.x*w},${p.y*h}`).join(' L');
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d', pts ? `M${pts} Z` : '');
+    path.setAttribute('fill', d.color); path.setAttribute('fill-opacity','0.22');
+    path.setAttribute('stroke', d.color); path.setAttribute('stroke-width', tk);
+    path.setAttribute('stroke-linejoin','round');
+    g.appendChild(path);
+    return g;
+  }
+  // fallback
+  return document.createElementNS(ns,'g');
+}
+
+// ---------------------------------------------------------------------
+// 3D EXPORT (keystone projection)
+// The on-screen 3D preview tilts the <svg> with CSS (rotateX/scale), which
+// canvas/Image rasterization ignores entirely. To make PNG/JPEG/SVG exports
+// actually look "3D" in 3D view, we rebuild the whole scene using a 2D
+// keystone projection: the far (top) edge of the pitch is narrower and
+// compressed into a horizon band, the near (bottom) edge is full size, and
+// players/markers shrink with depth — the classic broadcast-camera look.
+// ---------------------------------------------------------------------
+// Builds a 2D "keystone" projection from the adjustable camera params
+// (tilt/rotate/zoom — see state.camera) so 3D exports match the on-screen
+// preview. Higher tilt = more horizon visible + steeper perspective
+// (mirrors rotateX); zoom scales the whole projected scene (mirrors CSS
+// scale); rotate is applied as a final in-plane rotation (mirrors rotateZ).
+function make3DProjector(vx,vy,vw,vh,camera){
+  camera = camera || { tilt:42, rotate:0, zoom:1.18 };
+  const skyFrac = Math.min(0.4, Math.max(0.02, (camera.tilt/90)*0.26));
+  const sFarRatio = Math.min(0.95, Math.max(0.15, 1-(camera.tilt/90)*0.964));
+  const sNear = camera.zoom;
+  const sFar = sNear*sFarRatio;
+  const pitchTop = vy + vh*skyFrac;
+  const vScale = 1 - skyFrac;
+  const midX = vx + vw/2;
+  function proj(x,y){
+    const t = Math.min(1, Math.max(0, (y-vy)/vh));
+    const s = sFar + (sNear-sFar)*t;
+    return { x: midX + (x-midX)*s, y: pitchTop + (y-vy)*vScale, s };
+  }
+  proj.vScale = vScale;
+  proj.skyFrac = skyFrac;
+  proj.midX = midX;
+  proj.rotate = camera.rotate || 0;
+  return proj;
+}
+
+// Pitch markings are authored in a 1050x680 base space and rotated into the
+// current orientation via getPitchTransform(); replicate that mapping so
+// marking coordinates land in the same final space as the viewBox before
+// projecting.
+function markToFinal(px,py){
+  if(state.orientation!=='vertical') return {x:px,y:py};
+  const baseY = state.fieldType === 'half' ? 525 : 1050;
+  return {x:py,y:baseY-px};
+}
+
+function buildPitchMarkings3D(proj){
+  const ns='http://www.w3.org/2000/svg';
+  const g = document.createElementNS(ns,'g');
+  const pt = (p)=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+  const projMark = (px,py)=>{ const f=markToFinal(px,py); return proj(f.x,f.y); };
+  const quad = (x,y,w,h,fill='none')=>{
+    const a=projMark(x,y), b=projMark(x+w,y), c=projMark(x+w,y+h), d=projMark(x,y+h);
+    const el = document.createElementNS(ns,'path');
+    el.setAttribute('d',`M${pt(a)} L${pt(b)} L${pt(c)} L${pt(d)} Z`);
+    el.setAttribute('fill',fill);
+    if(fill==='none'){ el.setAttribute('stroke','var(--line)'); el.setAttribute('stroke-width','2'); }
+    g.appendChild(el);
+  };
+  const line = (x1,y1,x2,y2)=>{
+    const a=projMark(x1,y1), b=projMark(x2,y2);
+    const el = document.createElementNS(ns,'line');
+    el.setAttribute('x1',a.x.toFixed(2)); el.setAttribute('y1',a.y.toFixed(2));
+    el.setAttribute('x2',b.x.toFixed(2)); el.setAttribute('y2',b.y.toFixed(2));
+    el.setAttribute('stroke','var(--line)'); el.setAttribute('stroke-width','2');
+    g.appendChild(el);
+  };
+  const ellipse = (cx,cy,r,fill='none')=>{
+    const p=projMark(cx,cy);
+    const el = document.createElementNS(ns,'ellipse');
+    el.setAttribute('cx',p.x.toFixed(2)); el.setAttribute('cy',p.y.toFixed(2));
+    el.setAttribute('rx',Math.max(0.5,r*p.s).toFixed(2));
+    el.setAttribute('ry',Math.max(0.5,r*proj.vScale).toFixed(2));
+    el.setAttribute('fill',fill);
+    if(fill==='none'){ el.setAttribute('stroke','var(--line)'); el.setAttribute('stroke-width','2'); }
+    g.appendChild(el);
+  };
+  const arcPoly = (cx,cy,r,startDeg,endDeg,n=10)=>{
+    const pts=[];
+    for(let i=0;i<=n;i++){
+      const a=(startDeg+(endDeg-startDeg)*i/n)*Math.PI/180;
+      pts.push(projMark(cx+r*Math.cos(a), cy+r*Math.sin(a)));
+    }
+    const el = document.createElementNS(ns,'path');
+    el.setAttribute('d',`M${pts.map(pt).join(' L')}`);
+    el.setAttribute('fill','none'); el.setAttribute('stroke','var(--line)'); el.setAttribute('stroke-width','2');
+    g.appendChild(el);
+  };
+
+  // mowed-grass stripes/rings (always shown, even with "No Lines" enabled)
+  stripeRects().forEach(r=>quad(r.x,r.y,r.w,r.h,'rgba(255,255,255,0.035)'));
+  stripeRings().forEach(ring=>{
+    const p=projMark(ring.cx,ring.cy);
+    const el = document.createElementNS(ns,'ellipse');
+    el.setAttribute('cx',p.x.toFixed(2)); el.setAttribute('cy',p.y.toFixed(2));
+    el.setAttribute('rx',Math.max(0.5,ring.r*p.s).toFixed(2));
+    el.setAttribute('ry',Math.max(0.5,ring.r*proj.vScale).toFixed(2));
+    el.setAttribute('fill','none');
+    el.setAttribute('stroke','rgba(255,255,255,0.05)');
+    el.setAttribute('stroke-width',Math.max(0.5,ring.strokeWidth*proj.vScale).toFixed(2));
+    g.appendChild(el);
+  });
+  if(state.noLines) return g;
+  // boundary, halfway line, center circle + spot
+  quad(2,2,1046,676);
+  line(525,2,525,678);
+  ellipse(525,340,91.5);
+  ellipse(525,340,2,'var(--line)');
+  // penalty areas + six-yard boxes
+  quad(2,138.4,165,403.2);
+  quad(883,138.4,165,403.2);
+  quad(2,248.4,55,183.2);
+  quad(993,248.4,55,183.2);
+  // penalty spots + arcs
+  ellipse(110,340,2,'var(--line)');
+  ellipse(940,340,2,'var(--line)');
+  arcPoly(110,340,91.5,-52.05,52.05,12);
+  arcPoly(940,340,91.5,127.95,232.05,12);
+  // goals
+  quad(-18,303.4,18,73.2);
+  quad(1050,303.4,18,73.2);
+  // corner arcs
+  arcPoly(2,2,10,90,0,6);
+  arcPoly(1048,2,10,180,90,6);
+  arcPoly(1048,678,10,270,180,6);
+  arcPoly(2,678,10,0,-90,6);
+  return g;
+}
+
+// Re-renders a single drawing using projected (keystone) coordinates for the
+// 3D export. Mirrors drawingToSVG's visual treatment for each type.
+function drawingToSVG3D(d,w,h,proj){
+  const ns='http://www.w3.org/2000/svg';
+  const tk = d.thickness || 3;       // line stroke width for arrows/curves
+  const tkScale = tk/3;              // scale factor for elements with non-3 base widths
+
+  // Unit Link endpoints come from the linked players' current positions
+  // (not d.x1/y1/x2/y2), so project them separately before the generic
+  // p1/p2 projection below (which assumes d.x1/d.y1/d.x2/d.y2 are set).
+  if(d.type==='unitLink'){
+    const pts = unitLinkEndpoints(d,w,h);
+    if(!pts) return document.createElementNS(ns,'g');
+    const pr1 = proj(pts.x1,pts.y1), pr2 = proj(pts.x2,pts.y2);
+    return unitLinkSVG(pr1.x,pr1.y,pr2.x,pr2.y,d.color, 27*pr1.s,27*proj.vScale, 27*pr2.s,27*proj.vScale, 7*tkScale,3.5*tkScale);
+  }
+
+  const p1 = proj(d.x1*w, d.y1*h), p2 = proj(d.x2*w, d.y2*h);
+  const x1=p1.x, y1=p1.y, x2=p2.x, y2=p2.y;
+  if(d.type==='arrow'||d.type==='dashedArrow'||d.type==='passLine'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const line = document.createElementNS(ns,'line');
+    line.setAttribute('x1',x1); line.setAttribute('y1',y1);
+    line.setAttribute('x2',x2); line.setAttribute('y2',y2);
+    line.setAttribute('stroke', d.color);
+    line.setAttribute('stroke-width', tk);
+    line.setAttribute('stroke-linecap','round');
+    if(d.type!=='arrow') line.setAttribute('stroke-dasharray', d.type==='passLine'?'2,4':'8,6');
+    if(d.type!=='passLine') line.setAttribute('marker-end','url(#arrowHead)');
+    g.appendChild(line);
+    const hi = document.createElementNS(ns,'line');
+    hi.setAttribute('x1',x1); hi.setAttribute('y1',y1-1);
+    hi.setAttribute('x2',x2); hi.setAttribute('y2',y2-1);
+    hi.setAttribute('stroke', shadeColor(d.color,0.55));
+    hi.setAttribute('stroke-width', 1);
+    hi.setAttribute('stroke-linecap','round');
+    hi.setAttribute('opacity','0.7');
+    if(d.type!=='arrow') hi.setAttribute('stroke-dasharray', d.type==='passLine'?'2,4':'8,6');
+    g.appendChild(hi);
+    return g;
+  }
+  if(d.type==='loftedPass'){
+    const ctl0 = (d.cx!=null && d.cy!=null) ? {cx:d.cx, cy:d.cy} : defaultLoftControl(d);
+    const pc = proj(ctl0.cx*w, ctl0.cy*h);
+    return loftedPassSVG(x1,y1,x2,y2,pc.x,pc.y,d.color,11*tkScale);
+  }
+  if(d.type==='angleZone'){
+    const angleDeg = d.angle!=null ? d.angle : 90;
+    return angleZoneSVG(d.x1*w,d.y1*h,d.x2*w,d.y2*h,angleDeg,d.color,tk,proj);
+  }
+  if(d.type==='ruler'){
+    return rulerSVG(d.x1*w,d.y1*h,d.x2*w,d.y2*h,d.color,tk,proj);
+  }
+  if(d.type==='triangleZone'){
+    return triangleZoneSVG(d.x1*w,d.y1*h,d.x2*w,d.y2*h,d.color,tk,proj);
+  }
+  if(d.type==='curveArrow'){
+    const ctl0 = (d.cx!=null && d.cy!=null) ? {cx:d.cx, cy:d.cy} : defaultCurveControl(d);
+    const pc = proj(ctl0.cx*w, ctl0.cy*h);
+    const g = document.createElementNS(ns,'g');
+
+    const arcG = document.createElementNS(ns,'g');
+    arcG.setAttribute('filter','url(#dropShadow3d)');
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d',`M${x1},${y1} Q${pc.x},${pc.y} ${x2},${y2}`);
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', d.color);
+    path.setAttribute('stroke-width', tk);
+    path.setAttribute('stroke-linecap','round');
+    path.setAttribute('stroke-dasharray','6,5');
+    path.setAttribute('marker-end','url(#arrowHead)');
+    arcG.appendChild(path);
+    const hi = document.createElementNS(ns,'path');
+    hi.setAttribute('d',`M${x1},${y1-1} Q${pc.x},${pc.y-1} ${x2},${y2-1}`);
+    hi.setAttribute('fill','none');
+    hi.setAttribute('stroke', shadeColor(d.color,0.55));
+    hi.setAttribute('stroke-width', 1);
+    hi.setAttribute('stroke-linecap','round');
+    hi.setAttribute('stroke-dasharray','6,5');
+    hi.setAttribute('opacity','0.7');
+    arcG.appendChild(hi);
+    g.appendChild(arcG);
+    return g;
+  }
+  if(d.type==='zone'){
+    const p3 = proj(d.x2*w, d.y1*h), p4 = proj(d.x1*w, d.y2*h);
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d',`M${x1},${y1} L${p3.x},${p3.y} L${x2},${y2} L${p4.x},${p4.y} Z`);
+    path.setAttribute('fill',d.color); path.setAttribute('fill-opacity','0.25');
+    path.setAttribute('stroke',d.color); path.setAttribute('stroke-width',tk);
+    g.appendChild(path);
+    return g;
+  }
+  if(d.type==='circleZone'){
+    const rFinal = Math.hypot((d.x2-d.x1)*w,(d.y2-d.y1)*h);
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const c = document.createElementNS(ns,'ellipse');
+    c.setAttribute('cx',x1); c.setAttribute('cy',y1);
+    c.setAttribute('rx',Math.max(0.5,rFinal*p1.s));
+    c.setAttribute('ry',Math.max(0.5,rFinal*proj.vScale));
+    c.setAttribute('fill',d.color); c.setAttribute('fill-opacity','0.18');
+    c.setAttribute('stroke',d.color); c.setAttribute('stroke-width',tk);
+    g.appendChild(c);
+    return g;
+  }
+  if(d.type==='text'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const t = document.createElementNS(ns,'text');
+    t.setAttribute('x',x1); t.setAttribute('y',y1);
+    t.setAttribute('fill',d.color); t.setAttribute('font-size',(22*p1.s).toFixed(1)); t.setAttribute('font-weight','700');
+    t.setAttribute('font-family','sans-serif');
+    t.textContent = d.text || 'Label';
+    g.appendChild(t);
+    return g;
+  }
+  if(d.type==='polygon'){
+    const g = document.createElementNS(ns,'g');
+    g.setAttribute('filter','url(#dropShadow3d)');
+    const pts = (d.points||[]).map(pp=>{ const p=proj(pp.x*w, pp.y*h); return `${p.x.toFixed(2)},${p.y.toFixed(2)}`; }).join(' L');
+    const path = document.createElementNS(ns,'path');
+    path.setAttribute('d', pts ? `M${pts} Z` : '');
+    path.setAttribute('fill', d.color); path.setAttribute('fill-opacity','0.22');
+    path.setAttribute('stroke', d.color); path.setAttribute('stroke-width', tk);
+    path.setAttribute('stroke-linejoin','round');
+    g.appendChild(path);
+    return g;
+  }
+  return document.createElementNS(ns,'g');
+}
+
+function screenToSvg(clientX, clientY){
+  const rect = svg.getBoundingClientRect();
+  const [vx,vy,vw,vh] = getViewBox();
+  // In 3D view the <svg> itself is rotated via CSS (rotateX/rotateZ/scale)
+  // inside a perspective:1400px wrapper, so it renders as a trapezoid: the
+  // "far" edge occupies much less of the bounding box than the "near" edge.
+  // The plain linear rect-based mapping below assumes a flat rectangle and
+  // would place everything near the far/top edge regardless of where the
+  // user actually clicked. Use the element's screen CTM (a full 3D matrix
+  // that includes the perspective + rotation) to unproject the screen point
+  // back onto the SVG's z=0 plane for an accurate hit position.
+  if(state.view3d && svg.getScreenCTM){
+    try{
+      const ctm = svg.getScreenCTM();
+      if(ctm){
+        const inv = ctm.inverse();
+        const near = new DOMPoint(clientX, clientY, 0, 1).matrixTransform(inv);
+        const far = new DOMPoint(clientX, clientY, 1, 1).matrixTransform(inv);
+        const a = {x:near.x/near.w, y:near.y/near.w, z:near.z/near.w};
+        const b = {x:far.x/far.w, y:far.y/far.w, z:far.z/far.w};
+        const dz = b.z - a.z;
+        if(dz){
+          const t = -a.z/dz;
+          return { x: a.x + t*(b.x-a.x), y: a.y + t*(b.y-a.y) };
+        }
+      }
+    }catch(err){ /* fall through to the linear approximation below */ }
+  }
+  // Linear fallback: the SVG's bounding rect now corresponds to the outer
+  // (banner-inclusive) viewBox when the ad banner is enabled, so account for
+  // the border margin `b` here too. Reduces to the original formula when
+  // b=0 (banner off, or 3D — see getBorderSize()).
+  const b = getBorderSize(vw,vh);
+  const x = (vx-b) + (clientX-rect.left)/rect.width*(vw+2*b);
+  const y = (vy-b) + (clientY-rect.top)/rect.height*(vh+2*b);
+  return {x,y};
+}
+
+function applySnap(obj){
+  if(!state.snap) return;
+  const [,,w,h] = getViewBox();
+  const grid = 10; // 1 meter
+  const x = obj.fx*w, y = obj.fy*h;
+  obj.fx = Math.round(x/grid)*grid/w;
+  obj.fy = Math.round(y/grid)*grid/h;
+}
+
+// ---------------------------------------------------------------------
+// MOVE EXISTING OBJECTS
+// ---------------------------------------------------------------------
+let dragging = null;
+let draggingCurveHandle = null;
+let draggingDrawing = null;
+let dragDrawingLast = null;
+// Multi-Select & Move: pointerdown on a player while state.tool==='multiSelect'.
+// If the pointer moves beyond a small threshold, drags every player in
+// state.multiSelectIds (or just this one, if it isn't part of the group) by
+// the same delta. If the pointer never moves, pointerup toggles this
+// player's membership in the group instead.
+let groupDrag = null;
+// Field Image repositioning: pointerdown on a #fieldImg_<id> watermark while
+// in Select mode lets the user drag it anywhere on the pitch (unless locked).
+let draggingFieldImage = null;
+function startDragObject(e, obj){
+  if(state.tool==='eraser'){
+    currentFrame().objects = currentFrame().objects.filter(o=>o.id!==obj.id);
+    snapshot(); render();
+    return;
+  }
+  if(state.tool==='unitLink'){
+    handleUnitLinkClick(e, obj);
+    return;
+  }
+  if(state.tool==='highlightPlayer'){
+    if(obj.type!=='player') return;
+    e.stopPropagation();
+    obj.highlighted = !obj.highlighted;
+    snapshot();
+    renderObjects();
+    return;
+  }
+  if(state.tool==='multiSelect'){
+    if(obj.type!=='player') return;
+    e.stopPropagation();
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    groupDrag = { obj, last:{x:pt.x/w, y:pt.y/h}, moved:false };
+    svg.setPointerCapture(e.pointerId);
+    return;
+  }
+  if(state.tool!=='select') return;
+  e.stopPropagation();
+  state.selectedId = obj.id;
+  dragging = obj;
+  svg.setPointerCapture(e.pointerId);
+  updatePropsPanel();
+}
+
+// Unit Link tool: click a player to arm it (shown with a dashed ring), then
+// click a different player to create a link connecting the two. Clicking
+// the armed player again cancels the selection.
+let unitLinkFrom = null;
+function handleUnitLinkClick(e, obj){
+  if(obj.type!=='player') return;
+  e.stopPropagation();
+  if(unitLinkFrom===obj.id){
+    unitLinkFrom = null;
+    previewLayer.innerHTML='';
+    renderObjects();
+    return;
+  }
+  if(!unitLinkFrom){
+    unitLinkFrom = obj.id;
+    renderObjects();
+    return;
+  }
+  const drawing = {id:'d'+Math.random().toString(36).slice(2,9), type:'unitLink', fromId:unitLinkFrom, toId:obj.id, color:state.drawColor, thickness:state.strokeThickness};
+  currentFrame().drawings.push(drawing);
+  unitLinkFrom = null;
+  previewLayer.innerHTML='';
+  snapshot();
+  render();
+}
+svg.addEventListener('pointermove', e=>{
+  if(dragging){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    dragging.fx = Math.min(1,Math.max(0,pt.x/w));
+    dragging.fy = Math.min(1,Math.max(0,pt.y/h));
+    applySnap(dragging);
+    renderObjects();
+  } else if(draggingCurveHandle){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    draggingCurveHandle.cx = pt.x/w;
+    draggingCurveHandle.cy = pt.y/h;
+    renderDrawings();
+  } else if(draggingDrawing){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    const fx = pt.x/w, fy = pt.y/h;
+    const dx = fx - dragDrawingLast.x, dy = fy - dragDrawingLast.y;
+    draggingDrawing.x1 += dx; draggingDrawing.y1 += dy;
+    draggingDrawing.x2 += dx; draggingDrawing.y2 += dy;
+    if(draggingDrawing.cx!=null) draggingDrawing.cx += dx;
+    if(draggingDrawing.cy!=null) draggingDrawing.cy += dy;
+    if(draggingDrawing.points) draggingDrawing.points.forEach(p=>{ p.x += dx; p.y += dy; });
+    dragDrawingLast = {x:fx, y:fy};
+    renderDrawings();
+  } else if(drawingStart){
+    updateDrawPreview(e);
+  } else if(state.tool==='unitLink' && unitLinkFrom){
+    const o1 = currentFrame().objects.find(o=>o.id===unitLinkFrom);
+    if(o1){
+      const pt = screenToSvg(e.clientX, e.clientY);
+      const [,,w,h] = getViewBox();
+      const tkScale = (state.strokeThickness||3)/3;
+      previewLayer.innerHTML='';
+      const el = unitLinkSVG(o1.fx*w, o1.fy*h, pt.x, pt.y, state.drawColor, 27,27,27,27, 7*tkScale, 3.5*tkScale);
+      el.setAttribute('opacity','0.6');
+      previewLayer.appendChild(el);
+    }
+  } else if(state.tool==='polygon' && polygonPoints.length>0){
+    updatePolygonPreview(e);
+  } else if(groupDrag){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    const fx = pt.x/w, fy = pt.y/h;
+    const dx = fx - groupDrag.last.x, dy = fy - groupDrag.last.y;
+    if(!groupDrag.moved && (Math.abs(dx)+Math.abs(dy)) * Math.max(w,h) < 3) return;
+    groupDrag.moved = true;
+    const ids = state.multiSelectIds.includes(groupDrag.obj.id) ? state.multiSelectIds : [groupDrag.obj.id];
+    currentFrame().objects.forEach(o=>{
+      if(ids.includes(o.id)){
+        o.fx = Math.min(1,Math.max(0,o.fx+dx));
+        o.fy = Math.min(1,Math.max(0,o.fy+dy));
+      }
+    });
+    groupDrag.last = {x:fx, y:fy};
+    renderObjects();
+  } else if(draggingFieldImage){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    draggingFieldImage.img.x = Math.min(1,Math.max(0, pt.x/w - draggingFieldImage.offsetX));
+    draggingFieldImage.img.y = Math.min(1,Math.max(0, pt.y/h - draggingFieldImage.offsetY));
+    render();
+  }
+});
+// Start dragging a field image watermark (Select tool only, unless locked).
+svg.addEventListener('pointerdown', e=>{
+  if(state.tool==='select' && e.target.id && e.target.id.startsWith('fieldImg_')){
+    const id = e.target.id.slice('fieldImg_'.length);
+    const img = (state.fieldImages||[]).find(f=>f.id===id);
+    if(!img || img.locked) return;
+    e.stopPropagation();
+    const pt = screenToSvg(e.clientX, e.clientY);
+    const [,,w,h] = getViewBox();
+    const lx = img.x!=null ? img.x : 0.5;
+    const ly = img.y!=null ? img.y : 0.5;
+    draggingFieldImage = { img, offsetX: pt.x/w - lx, offsetY: pt.y/h - ly };
+    svg.setPointerCapture(e.pointerId);
+  }
+});
+svg.addEventListener('pointerup', e=>{
+  if(dragging){ dragging=null; snapshot(); render(); }
+  if(draggingCurveHandle){ draggingCurveHandle=null; snapshot(); render(); }
+  if(draggingDrawing){ draggingDrawing=null; dragDrawingLast=null; snapshot(); render(); }
+  if(drawingStart){ finishDrawing(e); }
+  if(draggingFieldImage){ draggingFieldImage=null; snapshot(); render(); }
+  if(groupDrag){
+    if(groupDrag.moved){
+      const ids = state.multiSelectIds.includes(groupDrag.obj.id) ? state.multiSelectIds : [groupDrag.obj.id];
+      currentFrame().objects.forEach(o=>{ if(ids.includes(o.id)) applySnap(o); });
+      snapshot(); render();
+    } else {
+      // No movement: treat as a click that toggles group membership.
+      const id = groupDrag.obj.id;
+      const idx = state.multiSelectIds.indexOf(id);
+      if(idx>=0) state.multiSelectIds.splice(idx,1);
+      else state.multiSelectIds.push(id);
+      renderObjects();
+    }
+    groupDrag = null;
+  }
+});
+
+// ---------------------------------------------------------------------
+// DRAWING TOOLS (arrows, zones, circles, labels)
+// ---------------------------------------------------------------------
+let drawingStart=null;
+svg.addEventListener('pointerdown', e=>{
+  // Unit Link, Highlight Player and Polygon use click-based interactions
+  // (handled by startDragObject / the click & dblclick listeners below),
+  // not drag-between-two-points.
+  if(state.tool==='select' || state.tool==='eraser' || state.tool==='unitLink' || state.tool==='highlightPlayer' || state.tool==='polygon') return;
+  if(e.target.closest('.obj') || e.target.closest('[data-id]')) return;
+  const pt = screenToSvg(e.clientX, e.clientY);
+  const [,,w,h] = getViewBox();
+  if(state.tool==='text'){
+    const text = prompt('Label text:','Coaching point');
+    if(text){
+      currentFrame().drawings.push({id:'d'+Math.random().toString(36).slice(2,9), type:'text', x1:pt.x/w, y1:pt.y/h, x2:pt.x/w, y2:pt.y/h, color:state.drawColor, text});
+      snapshot(); render();
+    }
+    return;
+  }
+  drawingStart = {x:pt.x/w, y:pt.y/h};
+});
+
+// ---------------------------------------------------------------------
+// POLYGON TOOL
+// Click to drop vertices, with a live rubber-band line to the cursor.
+// Finish with a double-click or Enter (needs >=3 points); Escape cancels.
+// ---------------------------------------------------------------------
+let polygonPoints = [];
+function addPolygonPoint(e){
+  if(e.target.closest('.obj') || e.target.closest('[data-id]')) return;
+  const pt = screenToSvg(e.clientX, e.clientY);
+  const [,,w,h] = getViewBox();
+  polygonPoints.push({x: pt.x/w, y: pt.y/h});
+  updatePolygonPreview(e);
+}
+function updatePolygonPreview(e){
+  previewLayer.innerHTML='';
+  if(polygonPoints.length===0) return;
+  const ns='http://www.w3.org/2000/svg';
+  const [,,w,h] = getViewBox();
+  let d = `M${polygonPoints.map(p=>`${p.x*w},${p.y*h}`).join(' L')}`;
+  if(e){
+    const pt = screenToSvg(e.clientX, e.clientY);
+    d += ` L${pt.x},${pt.y}`;
+  }
+  const path = document.createElementNS(ns,'path');
+  path.setAttribute('d', d);
+  path.setAttribute('fill', state.drawColor);
+  path.setAttribute('fill-opacity','0.15');
+  path.setAttribute('stroke', state.drawColor);
+  path.setAttribute('stroke-width', state.strokeThickness||3);
+  path.setAttribute('stroke-dasharray','5,4');
+  path.setAttribute('opacity','0.8');
+  previewLayer.appendChild(path);
+  polygonPoints.forEach(p=>{
+    const c = document.createElementNS(ns,'circle');
+    c.setAttribute('cx', p.x*w); c.setAttribute('cy', p.y*h);
+    c.setAttribute('r','5');
+    c.setAttribute('fill', state.drawColor);
+    c.setAttribute('stroke','#ffffff'); c.setAttribute('stroke-width','1.5');
+    previewLayer.appendChild(c);
+  });
+}
+function finishPolygon(){
+  // Double-click fires two click events at (roughly) the same spot before
+  // dblclick; drop that trailing duplicate vertex.
+  if(polygonPoints.length>=2){
+    const a=polygonPoints[polygonPoints.length-1], b=polygonPoints[polygonPoints.length-2];
+    if(Math.hypot(a.x-b.x,a.y-b.y) < 0.0015) polygonPoints.pop();
+  }
+  if(polygonPoints.length>=3){
+    currentFrame().drawings.push({id:'d'+Math.random().toString(36).slice(2,9), type:'polygon', points: polygonPoints.map(p=>({x:p.x,y:p.y})), color:state.drawColor, thickness:state.strokeThickness});
+    snapshot();
+  }
+  cancelPolygon();
+  render();
+}
+function cancelPolygon(){
+  polygonPoints = [];
+  previewLayer.innerHTML='';
+}
+svg.addEventListener('click', e=>{
+  if(state.tool==='polygon') addPolygonPoint(e);
+});
+svg.addEventListener('dblclick', e=>{
+  if(state.tool==='polygon'){
+    e.preventDefault();
+    if(polygonPoints.length>=3) finishPolygon();
+  }
+});
+function updateDrawPreview(e){
+  const pt = screenToSvg(e.clientX, e.clientY);
+  const [,,w,h] = getViewBox();
+  const d = {id:'preview', type:state.tool, x1:drawingStart.x, y1:drawingStart.y, x2:pt.x/w, y2:pt.y/h, color:state.drawColor, thickness:state.strokeThickness};
+  if(state.tool==='angleZone') d.angle = 90;
+  previewLayer.innerHTML='';
+  const el = drawingToSVG(d,w,h);
+  el.setAttribute('opacity','0.7');
+  previewLayer.appendChild(el);
+}
+function finishDrawing(e){
+  const pt = screenToSvg(e.clientX, e.clientY);
+  const [,,w,h] = getViewBox();
+  const x2=pt.x/w, y2=pt.y/h;
+  if(Math.hypot((x2-drawingStart.x)*w,(y2-drawingStart.y)*h) > 3){
+    const drawing = {id:'d'+Math.random().toString(36).slice(2,9), type:state.tool, x1:drawingStart.x, y1:drawingStart.y, x2, y2, color:state.drawColor, thickness:state.strokeThickness};
+    if(state.tool==='angleZone') drawing.angle = 90;
+    currentFrame().drawings.push(drawing);
+    snapshot();
+  }
+  drawingStart=null;
+  previewLayer.innerHTML='';
+  render();
+}
+// click empty space deselects
+svg.addEventListener('click', e=>{
+  if(e.target===svg || e.target.tagName==='rect' && !e.target.closest('[data-id]')){
+    if(state.tool==='select'){ state.selectedId=null; updatePropsPanel(); }
+    if(state.tool==='multiSelect' && state.multiSelectIds.length){ state.multiSelectIds=[]; renderObjects(); }
+  }
+});
+
+// ---------------------------------------------------------------------
+// PROPERTIES PANEL
+// ---------------------------------------------------------------------
+function updatePropsPanel(){
+  const panel = document.getElementById('propsPanel');
+  const obj = currentFrame().objects.find(o=>o.id===state.selectedId);
+  const drawing = currentFrame().drawings.find(d=>d.id===state.selectedId);
+  if(obj){
+    panel.innerHTML = `
+      <label>Type</label><div>${obj.type}${obj.team?(' • Team '+obj.team):''}${obj.gk?' • GK':''}</div>
+      ${obj.type==='player'?`<label>Number / Label</label><input id="propNum" value="${obj.number}"/>`:''}
+      ${obj.type==='posLabel'?`<label>Text</label><input id="propText" value="${obj.text}"/>`:''}
+      <label>Delete</label><button class="toolbtn" id="propDelete" style="border:1px solid var(--border);width:100%;">Delete object</button>
+    `;
+    const numInput = document.getElementById('propNum');
+    if(numInput) numInput.oninput = e=>{ obj.number=e.target.value; renderObjects(); };
+    const txtInput = document.getElementById('propText');
+    if(txtInput) txtInput.oninput = e=>{ obj.text=e.target.value; renderObjects(); };
+    document.getElementById('propDelete').onclick = ()=>{
+      currentFrame().objects = currentFrame().objects.filter(o=>o.id!==obj.id);
+      state.selectedId=null; snapshot(); render();
+    };
+  } else if(drawing){
+    const showThickness = ['arrow','dashedArrow','curveArrow','loftedPass','passLine','unitLink','zone','circleZone','angleZone','ruler','triangleZone','polygon'].includes(drawing.type);
+    panel.innerHTML = `
+      <label>Type</label><div>${drawing.type}</div>
+      <label>Color</label>
+      <div class="swatches" id="colorSwatches"></div>
+      ${drawing.type==='text'?`<label>Text</label><input id="propDrawText" value="${drawing.text}"/>`:''}
+      ${drawing.type==='angleZone'?`<label>Angle (degrees)</label><input id="propAngle" type="number" min="5" max="355" step="1" value="${drawing.angle!=null?drawing.angle:90}"/>`:''}
+      ${showThickness?`<label>Thickness</label><div class="thickness-row" id="propThicknessRow"></div>`:''}
+      <label>Delete</label><button class="toolbtn" id="propDrawDelete" style="border:1px solid var(--border);width:100%;">Delete drawing</button>
+    `;
+    const sw = document.getElementById('colorSwatches');
+    COLORS.forEach(c=>{
+      const s = document.createElement('div');
+      s.className='swatch'+(drawing.color===c?' sel':'');
+      s.style.background=c;
+      s.onclick=()=>{ drawing.color=c; snapshot(); render(); };
+      sw.appendChild(s);
+    });
+    const picker = document.createElement('input');
+    picker.type='color';
+    picker.className='swatch-custom';
+    picker.title='Custom color';
+    picker.value = /^#[0-9a-fA-F]{6}$/.test(drawing.color) ? drawing.color : '#ffffff';
+    picker.oninput = ()=>{ drawing.color=picker.value; renderDrawings(); };
+    picker.onchange = ()=>{ drawing.color=picker.value; snapshot(); render(); };
+    sw.appendChild(picker);
+    const txt = document.getElementById('propDrawText');
+    if(txt) txt.oninput = e=>{ drawing.text=e.target.value; renderDrawings(); };
+    const angleInput = document.getElementById('propAngle');
+    if(angleInput) angleInput.oninput = e=>{
+      const v = parseFloat(e.target.value);
+      drawing.angle = isNaN(v) ? 90 : Math.min(355,Math.max(5,v));
+      renderDrawings();
+    };
+    if(angleInput) angleInput.onchange = ()=>{ snapshot(); render(); };
+    const thicknessRow = document.getElementById('propThicknessRow');
+    if(thicknessRow){
+      const current = thicknessId(drawing.thickness || 3);
+      THICKNESS_PRESETS.forEach(p=>{
+        const b = document.createElement('button');
+        b.className='toolbtn'+(current===p.id?' active':'');
+        b.dataset.thick = p.id;
+        b.innerHTML = `<span class="thickness-bar" style="background:${current===p.id?'#08210f':'var(--text)'}"></span>${p.label}`;
+        b.onclick = ()=>{ drawing.thickness = p.value; snapshot(); render(); };
+        thicknessRow.appendChild(b);
+      });
+    }
+    document.getElementById('propDrawDelete').onclick = ()=>{
+      currentFrame().drawings = currentFrame().drawings.filter(d=>d.id!==drawing.id);
+      state.selectedId=null; snapshot(); render();
+    };
+  } else {
+    panel.innerHTML = `<div class="hint">Select an object or drawing on the pitch to edit its properties.</div>
+    <label>Drawing Color</label>
+    <div class="swatches" id="globalSwatches"></div>
+    <label>Default Thickness</label>
+    <div class="thickness-row" id="globalThicknessRow"></div>`;
+    const sw = document.getElementById('globalSwatches');
+    if(sw){
+      COLORS.forEach(c=>{
+        const s = document.createElement('div');
+        s.className='swatch'+(state.drawColor===c?' sel':'');
+        s.style.background=c;
+        s.onclick=()=>{ state.drawColor=c; updatePropsPanel(); };
+        sw.appendChild(s);
+      });
+      const picker = document.createElement('input');
+      picker.type='color';
+      picker.className='swatch-custom';
+      picker.title='Custom color';
+      picker.value = /^#[0-9a-fA-F]{6}$/.test(state.drawColor) ? state.drawColor : '#ffffff';
+      picker.oninput = ()=>{ state.drawColor=picker.value; };
+      picker.onchange = ()=>{ state.drawColor=picker.value; updatePropsPanel(); };
+      sw.appendChild(picker);
+    }
+    const tr = document.getElementById('globalThicknessRow');
+    if(tr){
+      const current = thicknessId(state.strokeThickness);
+      THICKNESS_PRESETS.forEach(p=>{
+        const b = document.createElement('button');
+        b.className='toolbtn'+(current===p.id?' active':'');
+        b.dataset.thick = p.id;
+        b.innerHTML = `<span class="thickness-bar" style="background:${current===p.id?'#08210f':'var(--text)'}"></span>${p.label}`;
+        b.onclick = ()=>{ state.strokeThickness = p.value; updatePropsPanel(); renderThicknessUI(); };
+        tr.appendChild(b);
+      });
+    }
+  }
+}
+
+// ---------------------------------------------------------------------
+// TIMELINE / FRAMES
+// ---------------------------------------------------------------------
+function renderFrameList(){
+  const list = document.getElementById('frameList');
+  list.innerHTML='';
+  state.frames.forEach((f,i)=>{
+    const b = document.createElement('button');
+    b.className='frame-btn'+(i===state.currentFrame?' active':'');
+    b.textContent = i+1;
+    b.onclick = ()=>{ state.currentFrame=i; state.selectedId=null; snapshot(); render(); };
+    list.appendChild(b);
+  });
+}
+document.getElementById('addFrameBtn').onclick = ()=>{
+  const clone = JSON.parse(JSON.stringify(currentFrame()));
+  clone.objects.forEach(o=>o.id='o'+Math.random().toString(36).slice(2,9));
+  clone.drawings.forEach(d=>d.id='d'+Math.random().toString(36).slice(2,9));
+  state.frames.splice(state.currentFrame+1,0,clone);
+  state.currentFrame++;
+  state.selectedId=null;
+  snapshot(); render();
+};
+document.getElementById('delFrameBtn').onclick = ()=>{
+  if(state.frames.length<=1) return;
+  state.frames.splice(state.currentFrame,1);
+  state.currentFrame = Math.max(0, state.currentFrame-1);
+  state.selectedId=null;
+  snapshot(); render();
+};
+
+// ---------------------------------------------------------------------
+// PLAYBACK / ANIMATION ENGINE
+// ---------------------------------------------------------------------
+let playTimer=null;
+// Persistent object-marker <g> elements (and the HTML last rendered into
+// each) reused across animation segments — see playStep() for why.
+let animObjElems = {};
+let animObjHTML = {};
+document.getElementById('playBtn').onclick = ()=>{
+  if(state.frames.length<2) return;
+  if(playTimer) return;
+  state.playing=true;
+  playStep();
+};
+document.getElementById('pauseBtn').onclick = ()=>{
+  state.playing=false;
+  if(playTimer){ cancelAnimationFrame(playTimer); playTimer=null; }
+};
+document.getElementById('stepFwdBtn').onclick = ()=>{
+  state.currentFrame = (state.currentFrame+1)%state.frames.length;
+  render();
+};
+document.getElementById('stepBackBtn').onclick = ()=>{
+  state.currentFrame = (state.currentFrame-1+state.frames.length)%state.frames.length;
+  render();
+};
+document.getElementById('speedRange').oninput = e=>{
+  state.speed = parseFloat(e.target.value);
+  document.getElementById('speedLabel').textContent = state.speed+'x';
+};
+
+// Smooth acceleration/deceleration so movement reads as "real" rather than
+// a robotic linear slide.
+function easeInOutCubic(t){
+  return t<0.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2;
+}
+
+// Cheap mid-transition UI sync: refreshes drawings + frame indicators without
+// the cost of a full render() (which rebuilds the pitch, object layer, props
+// panel, etc.) — avoids the stutter/"wait" between frame transitions.
+function lightUpdate(){
+  renderDrawings();
+  document.getElementById('frameLabel').textContent = state.currentFrame+1;
+  renderFrameList();
+}
+
+function playStep(){
+  if(!state.playing) return;
+  const fromIdx = state.currentFrame;
+  const toIdx = (fromIdx+1)%state.frames.length;
+  const from = state.frames[fromIdx];
+  const to = state.frames[toIdx];
+  const [,,w,h] = getViewBox();
+
+  // Build/reuse persistent nodes + interpolation targets once per segment,
+  // then each animation frame just nudges their transform — no DOM rebuild,
+  // no per-frame allocation, so motion stays buttery even with many objects.
+  //
+  // Reusing the same <g> elements across segments (instead of clearing and
+  // rebuilding objectLayer at every frame boundary) matters for the "video,
+  // not slideshow" feel: tearing down and recreating ~20 player markers
+  // (each with gradients/filters) every ~1s causes a brief synchronous
+  // reflow that reads as a freeze between poses. We only touch a marker's
+  // contents when its appearance actually changed, and only do a full
+  // rebuild when the cache is stale (e.g. after pause/step/render replaced
+  // objectLayer's children with a fresh static render).
+  const cacheValid = from.objects.length>0 && from.objects.every(o=>{
+    const g = animObjElems[o.id];
+    return g && g.parentNode===objectLayer;
+  });
+  if(!cacheValid){
+    objectLayer.innerHTML='';
+    animObjElems = {};
+    animObjHTML = {};
+  }
+  const seenIds = new Set();
+  const anims = from.objects.map(o=>{
+    seenIds.add(o.id);
+    const target = to.objects.find(x=>x.id===o.id);
+    const html = objectGroupHTML(o);
+    let g = animObjElems[o.id];
+    if(!g){
+      g = document.createElementNS('http://www.w3.org/2000/svg','g');
+      g.setAttribute('data-id', o.id);
+      g.classList.add('obj');
+      animObjElems[o.id] = g;
+    }
+    if(animObjHTML[o.id]!==html){
+      g.innerHTML = html;
+      animObjHTML[o.id] = html;
+    }
+    // Re-append to keep stacking order in sync with this frame's object
+    // order (appendChild moves an existing node rather than duplicating it).
+    objectLayer.appendChild(g);
+    return { g, fx0:o.fx, fy0:o.fy, fx1: target?target.fx:o.fx, fy1: target?target.fy:o.fy };
+  });
+  // Drop cached markers for objects that no longer exist in this frame.
+  Object.keys(animObjElems).forEach(id=>{
+    if(!seenIds.has(id)){
+      animObjElems[id].remove();
+      delete animObjElems[id];
+      delete animObjHTML[id];
+    }
+  });
+
+  // Scale this segment's duration to how far players actually travel, so
+  // motion reads at a consistent, realistic running speed — a short
+  // adjustment and a sprint the length of the pitch shouldn't both take the
+  // same fixed time, or the long run looks like a teleport and the short
+  // one looks like slow motion.
+  const travelFrac = anims.reduce((max,a)=>Math.max(max, Math.hypot(a.fx1-a.fx0, a.fy1-a.fy0)), 0);
+  const duration = Math.max(500, Math.min(2400, travelFrac*2600)) / state.speed;
+  const start = performance.now();
+
+  // Unit Link connectors are anchored to player positions, so they need to
+  // glide in lockstep with the players they group. Without this, the link
+  // stays frozen at its start-of-segment position while the players ease
+  // smoothly past it, then the link "snaps" to the new spot the instant the
+  // segment ends — which reads as a stutter even though player motion itself
+  // is smooth. Pre-compute each link's from/to endpoints here and nudge its
+  // existing SVG element (built by the last renderDrawings()) every frame
+  // alongside the players, using the same eased progress `t`.
+  const linkAnims = [];
+  from.drawings.forEach(d=>{
+    if(d.type!=='unitLink' || !d.fromId || !d.toId) return;
+    const o1From = from.objects.find(o=>o.id===d.fromId);
+    const o2From = from.objects.find(o=>o.id===d.toId);
+    if(!o1From || !o2From) return;
+    const o1To = to.objects.find(o=>o.id===d.fromId);
+    const o2To = to.objects.find(o=>o.id===d.toId);
+    const el = unitLinkLayer.querySelector(`[data-id="${d.id}"]`);
+    if(!el || el.children.length<4) return;
+    linkAnims.push({
+      el,
+      x1_0:o1From.fx, y1_0:o1From.fy, x2_0:o2From.fx, y2_0:o2From.fy,
+      x1_1:o1To?o1To.fx:o1From.fx, y1_1:o1To?o1To.fy:o1From.fy,
+      x2_1:o2To?o2To.fx:o2From.fx, y2_1:o2To?o2To.fy:o2From.fy,
+    });
+  });
+
+  function tick(now){
+    if(!state.playing) return;
+    const raw = Math.min(1, (now-start)/duration);
+    const t = easeInOutCubic(raw);
+    anims.forEach(a=>{
+      const fx = a.fx0 + (a.fx1-a.fx0)*t;
+      const fy = a.fy0 + (a.fy1-a.fy0)*t;
+      a.g.setAttribute('transform', `translate(${(fx*w).toFixed(2)},${(fy*h).toFixed(2)})`);
+    });
+    linkAnims.forEach(a=>{
+      const x1 = (a.x1_0 + (a.x1_1-a.x1_0)*t)*w;
+      const y1 = (a.y1_0 + (a.y1_1-a.y1_0)*t)*h;
+      const x2 = (a.x2_0 + (a.x2_1-a.x2_0)*t)*w;
+      const y2 = (a.y2_0 + (a.y2_1-a.y2_0)*t)*h;
+      const [line, hi, ring1, ring2] = a.el.children;
+      line.setAttribute('x1',x1.toFixed(2)); line.setAttribute('y1',y1.toFixed(2));
+      line.setAttribute('x2',x2.toFixed(2)); line.setAttribute('y2',y2.toFixed(2));
+      hi.setAttribute('x1',x1.toFixed(2)); hi.setAttribute('y1',(y1-1).toFixed(2));
+      hi.setAttribute('x2',x2.toFixed(2)); hi.setAttribute('y2',(y2-1).toFixed(2));
+      ring1.setAttribute('cx',x1.toFixed(2)); ring1.setAttribute('cy',y1.toFixed(2));
+      ring2.setAttribute('cx',x2.toFixed(2)); ring2.setAttribute('cy',y2.toFixed(2));
+    });
+    if(raw<1){
+      playTimer=requestAnimationFrame(tick);
+    } else {
+      state.currentFrame = toIdx;
+      playTimer=null;
+      if(toIdx===0){ state.playing=false; render(); }
+      else { lightUpdate(); playStep(); }
+    }
+  }
+  playTimer=requestAnimationFrame(tick);
+}
+
+// ---------------------------------------------------------------------
+// TOP CONTROLS
+// ---------------------------------------------------------------------
+function bindGroup(id, key, after){
+  document.querySelectorAll(`#${id} button`).forEach(btn=>{
+    btn.onclick = ()=>{
+      document.querySelectorAll(`#${id} button`).forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      state[key]=btn.dataset.val;
+      if(after) after();
+      render();
+    };
+  });
+}
+bindGroup('fieldTypeGrp','fieldType');
+bindGroup('orientGrp','orientation');
+document.querySelectorAll('#viewGrp button').forEach(btn=>{
+  btn.onclick = ()=>{
+    document.querySelectorAll('#viewGrp button').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.view3d = btn.dataset.val==='3d';
+    render();
+  };
+});
+
+// Camera controls (tilt / rotate / zoom) — live-update the on-screen 3D
+// preview transform as the user drags. CSS transition on #fieldSvg gives
+// these smooth, "real" camera-move motion rather than instant jumps.
+const camTilt = document.getElementById('camTilt');
+const camRotate = document.getElementById('camRotate');
+const camZoom = document.getElementById('camZoom');
+function applyCameraTransform(){
+  document.getElementById('cameraControls').classList.toggle('show', !!state.view3d);
+  if(state.view3d){
+    const {tilt, rotate, zoom} = state.camera;
+    svg.style.transform = `rotateX(${tilt}deg) rotateZ(${rotate}deg) scale(${zoom})`;
+  } else {
+    svg.style.transform = '';
+  }
+}
+[ [camTilt,'tilt'], [camRotate,'rotate'], [camZoom,'zoom'] ].forEach(([el,key])=>{
+  el.oninput = ()=>{
+    state.camera[key] = parseFloat(el.value);
+    applyCameraTransform();
+  };
+});
+
+document.getElementById('undoBtn').onclick = undo;
+document.getElementById('clearBtn').onclick = clearFrame;
+document.getElementById('multiSelectBtn').onclick = ()=>{
+  if(state.tool==='multiSelect'){
+    state.tool='select';
+  } else {
+    if(state.tool==='polygon') cancelPolygon();
+    state.tool='multiSelect';
+  }
+  state.multiSelectIds=[];
+  if(unitLinkFrom){ unitLinkFrom=null; previewLayer.innerHTML=''; }
+  renderPalette();
+  renderObjects();
+};
+document.getElementById('snapToggle').onchange = e=> state.snap = e.target.checked;
+
+document.getElementById('themeToggle').onclick = ()=>{
+  state.theme = state.theme==='dark'?'light':'dark';
+  document.body.setAttribute('data-theme', state.theme);
+  document.getElementById('themeToggle').textContent = state.theme==='dark' ? '🌙 Dark' : '☀ Light';
+};
+
+// ---------------------------------------------------------------------
+// PRESENTATION MODE
+// ---------------------------------------------------------------------
+// Hides every editing control and lets the board fill the screen (with a
+// best-effort browser fullscreen request) so the user can walk a group
+// through the tactics on a projector or shared screen.
+function exitPresentation(){
+  document.body.classList.remove('presentation-mode');
+  if(document.fullscreenElement){
+    document.exitFullscreen().catch(()=>{});
+  }
+  render();
+}
+
+document.getElementById('presentBtn').onclick = ()=>{
+  document.body.classList.add('presentation-mode');
+  // Fullscreen the whole document (not just the field) so the footer's
+  // playback transport (play/pause/step/speed/frame counter) stays visible
+  // alongside the board — fullscreening a single element hides everything
+  // outside it, including the footer.
+  if(document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+  render();
+};
+
+document.getElementById('exitPresentBtn').onclick = exitPresentation;
+
+// If the user exits fullscreen via the browser's own UI (Esc, etc.) while
+// presenting, drop out of presentation mode too so controls reappear.
+document.addEventListener('fullscreenchange', ()=>{
+  if(!document.fullscreenElement && document.body.classList.contains('presentation-mode')){
+    exitPresentation();
+  }
+});
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && document.body.classList.contains('presentation-mode')){
+    e.preventDefault(); exitPresentation(); return;
+  }
+  if((e.ctrlKey||e.metaKey) && e.key==='z'){ e.preventDefault(); undo(); }
+  if((e.ctrlKey||e.metaKey) && (e.key==='y'||(e.shiftKey&&e.key==='Z'))){ e.preventDefault(); redo(); }
+  if(state.tool==='polygon'){
+    if(e.key==='Enter'){ e.preventDefault(); if(polygonPoints.length>=3) finishPolygon(); }
+    if(e.key==='Escape'){ e.preventDefault(); cancelPolygon(); }
+  }
+  if(state.tool==='multiSelect' && e.key==='Escape' && state.multiSelectIds.length){
+    state.multiSelectIds=[]; renderObjects();
+  }
+  if(e.key==='Delete'||e.key==='Backspace'){
+    // Don't treat Delete/Backspace as "delete the selected object" while the
+    // user is typing in a text field (e.g. editing a player's Number/Label
+    // in the properties panel) — let the input handle the keystroke normally.
+    const tag = (e.target && e.target.tagName) || '';
+    const isEditable = tag==='INPUT' || tag==='TEXTAREA' || (e.target && e.target.isContentEditable);
+    if(isEditable) return;
+    if(state.selectedId){
+      currentFrame().objects = currentFrame().objects.filter(o=>o.id!==state.selectedId);
+      currentFrame().drawings = currentFrame().drawings.filter(d=>d.id!==state.selectedId);
+      state.selectedId=null; snapshot(); render();
+    }
+  }
+});
+
+// ---------------------------------------------------------------------
+// EXPORT
+// ---------------------------------------------------------------------
+// Brief on-screen confirmation so a successful export is visible even if the
+// browser saves the file silently to Downloads with no dialog.
+function showExportToast(msg, isError){
+  let toast = document.getElementById('exportToast');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'exportToast';
+    Object.assign(toast.style, {
+      position:'fixed', bottom:'18px', right:'18px', zIndex:'99999',
+      padding:'10px 16px', borderRadius:'8px', fontSize:'13px', fontWeight:'600',
+      color:'#fff', boxShadow:'0 4px 16px rgba(0,0,0,.35)', transition:'opacity .25s',
+      pointerEvents:'none',
+    });
+    document.body.appendChild(toast);
+  }
+  toast.style.background = isError ? '#dc2626' : '#16a34a';
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  clearTimeout(toast._hideTimer);
+  toast._hideTimer = setTimeout(()=>{ toast.style.opacity = '0'; }, isError ? 5000 : 2500);
+}
+
+// Builds a standalone, self-contained SVG string of the current frame
+// (resolving CSS custom properties to literal colors, and — in 3D view —
+// rebuilding the scene with the keystone projection) suitable for SVG/PNG
+// export or for rasterizing one frame of a video export. Returns the SVG
+// string plus the viewBox dimensions and a fallback background color.
+function buildExportSVGString(){
+  const clone = svg.cloneNode(true);
+  const [vx,vy,vw,vh] = getViewBox();
+
+  if(state.view3d){
+    // The on-screen 3D preview is a CSS rotateX/scale applied to the <svg>
+    // element itself, which canvas/Image rasterization ignores entirely. To
+    // make exports actually look "3D", rebuild the whole scene with a 2D
+    // keystone projection (make3DProjector): the far/top edge of the pitch
+    // is narrower and pushed into a horizon band, the near/bottom edge is
+    // full size, and players/markers shrink with depth.
+    const ns = 'http://www.w3.org/2000/svg';
+    const proj = make3DProjector(vx,vy,vw,vh,state.camera);
+    const pt = (p)=>`${p.x.toFixed(2)},${p.y.toFixed(2)}`;
+
+    const defs = clone.querySelector('defs');
+    const skyGrad = document.createElementNS(ns,'linearGradient');
+    skyGrad.setAttribute('id','exportSkyGrad');
+    skyGrad.setAttribute('x1','0'); skyGrad.setAttribute('y1','0');
+    skyGrad.setAttribute('x2','0'); skyGrad.setAttribute('y2','1');
+    skyGrad.innerHTML = '<stop offset="0" stop-color="#0a1730"/><stop offset="0.6" stop-color="#142a1d"/><stop offset="1" stop-color="var(--pitch2)"/>';
+    defs.appendChild(skyGrad);
+
+    // Oversize the background relative to the viewBox so that when the
+    // "rotate" camera control spins the whole scene a few degrees, the
+    // corners stay covered instead of showing transparent gaps.
+    const overscan = 0.35;
+    const bg = document.createElementNS(ns,'rect');
+    bg.setAttribute('x', vx - vw*overscan); bg.setAttribute('y', vy - vh*overscan);
+    bg.setAttribute('width', vw*(1+overscan*2)); bg.setAttribute('height', vh*(1+overscan*2));
+    bg.setAttribute('fill', 'url(#exportSkyGrad)');
+
+    // grass: project the viewBox's own corners into a keystone quad
+    const gA=proj(vx,vy), gB=proj(vx+vw,vy), gC=proj(vx+vw,vy+vh), gD=proj(vx,vy+vh);
+    const grass = document.createElementNS(ns,'path');
+    grass.setAttribute('d',`M${pt(gA)} L${pt(gB)} L${pt(gC)} L${pt(gD)} Z`);
+    grass.setAttribute('fill','url(#pitchGrad)');
+
+    const marks = buildPitchMarkings3D(proj);
+
+    // Field image watermark(s), projected onto the pitch like the markings.
+    const fieldLogoImgs = (state.fieldImages||[]).map(fimg=>{
+      const sizeFrac = fimg.size!=null ? fimg.size : 0.32;
+      const opacity = fimg.opacity!=null ? fimg.opacity : 0.28;
+      const lx = fimg.x!=null ? fimg.x : 0.5;
+      const ly = fimg.y!=null ? fimg.y : 0.5;
+      const fc = proj(vw*lx, vh*ly);
+      const size = Math.min(vw,vh)*sizeFrac*fc.s;
+      const el = document.createElementNS(ns,'image');
+      el.setAttribute('href', fimg.src);
+      el.setAttribute('x', (fc.x-size/2).toFixed(2));
+      el.setAttribute('y', (fc.y-size/2).toFixed(2));
+      el.setAttribute('width', size.toFixed(2));
+      el.setAttribute('height', size.toFixed(2));
+      el.setAttribute('opacity', opacity);
+      el.setAttribute('preserveAspectRatio','xMidYMid meet');
+      return el;
+    });
+
+    const objs = document.createElementNS(ns,'g');
+    currentFrame().objects.forEach(o=>{
+      const p = proj(o.fx*vw, o.fy*vh);
+      const og = document.createElementNS(ns,'g');
+      og.setAttribute('transform', `translate(${p.x.toFixed(2)},${p.y.toFixed(2)}) scale(${p.s.toFixed(3)})`);
+      og.innerHTML = objectGroupHTML(o);
+      objs.appendChild(og);
+    });
+
+    const draws = document.createElementNS(ns,'g');
+    currentFrame().drawings.forEach(d=>{
+      draws.appendChild(drawingToSVG3D(d, vw, vh, proj));
+    });
+
+    const label = document.createElementNS(ns,'text');
+    label.setAttribute('x', proj.midX); label.setAttribute('y', vy+vh*proj.skyFrac*0.55);
+    label.setAttribute('text-anchor','middle');
+    label.setAttribute('font-family','sans-serif');
+    label.setAttribute('font-size', vh*0.028);
+    label.setAttribute('fill','#ffffff');
+    label.setAttribute('opacity','0.6');
+    label.textContent = '3D preview — stylized broadcast camera angle';
+
+    // replace the live (2D) layers with the projected 3D scene
+    Array.from(clone.childNodes).forEach(node=>{
+      if(node.nodeName && node.nodeName.toLowerCase()!=='defs') clone.removeChild(node);
+    });
+
+    // Group the pitch + objects + drawings so the "rotate" camera control
+    // can spin the whole scene (mirroring the on-screen rotateZ); the
+    // overscanned bg above keeps the corners covered. The label stays
+    // unrotated so it reads horizontally.
+    const scene = document.createElementNS(ns,'g');
+    if(proj.rotate){
+      scene.setAttribute('transform', `rotate(${proj.rotate} ${vx+vw/2} ${vy+vh/2})`);
+    }
+    scene.appendChild(bg);
+    scene.appendChild(grass);
+    fieldLogoImgs.forEach(el=>scene.appendChild(el));
+    scene.appendChild(marks);
+    scene.appendChild(objs);
+    scene.appendChild(draws);
+    clone.appendChild(scene);
+    clone.appendChild(label);
+  }
+
+  // resolve CSS variables to literal colors for portability — the cloned
+  // SVG is serialized standalone, so any var(--x) reference (fills,
+  // strokes, gradient stops) must be replaced with a literal color or it
+  // renders as black/transparent in exported images.
+  const cssVars = getComputedStyle(document.body);
+  let svgStr = new XMLSerializer().serializeToString(clone);
+  ['--line','--pitch','--pitch2','--teamA','--teamANum','--gkA','--gkANum','--teamB','--teamBNum','--gkB','--gkBNum','--text','--accent','--border','--muted','--panel','--bg'].forEach(v=>{
+    const val = cssVars.getPropertyValue(v).trim();
+    if(val) svgStr = svgStr.split(`var(${v})`).join(val);
+  });
+  // ensure the SVG root itself declares a background so viewers that don't
+  // honor the pitchGrad rect (or crop it) still show a solid pitch color
+  const pitchColor = cssVars.getPropertyValue('--pitch2').trim() || '#0b3d20';
+  svgStr = svgStr.replace('<svg ', `<svg style="background:${pitchColor}" `);
+
+  // vw/vh are returned as the outer (banner-inclusive) dimensions so export
+  // canvas sizing matches the clone's actual viewBox (render() already set
+  // the live <svg>'s viewBox to the outer box before this clone was made).
+  const [,,ow,oh] = getOuterViewBox();
+  return {svgStr, vw: ow, vh: oh, pitchColor};
+}
+
+// Loads an SVG string as a rasterized <img>, via a base64 data URI rather
+// than a blob: URL — blob URLs created from a file:// page can fail to load
+// in an <img> element in some browsers.
+function svgStringToImage(svgStr){
+  return new Promise((resolve,reject)=>{
+    const img = new Image();
+    img.onload = ()=>resolve(img);
+    img.onerror = ()=>reject(new Error('could not render the image (check uploaded logo file types)'));
+    img.src = 'data:image/svg+xml;charset=utf-8;base64,' + utf8ToBase64(svgStr);
+  });
+}
+
+document.getElementById('exportBtn').onclick = ()=>{
+ try {
+  const format = document.getElementById('exportFormat').value;
+
+  if(format==='video'){
+    exportVideo();
+    return;
+  }
+
+  const {svgStr, pitchColor} = buildExportSVGString();
+
+  if(format==='svg'){
+    const blob = new Blob([svgStr], {type:'image/svg+xml'});
+    downloadBlob(blob, 'tactic-board.svg');
+    showExportToast('Exported tactic-board.svg');
+    return;
+  }
+  svgStringToImage(svgStr).then(img=>{
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = (img.naturalWidth||img.width||svg.clientWidth)*2; canvas.height = (img.naturalHeight||img.height||svg.clientHeight)*2;
+      const ctx = canvas.getContext('2d');
+      // always paint a pitch-colored background first (PNG canvases default
+      // to transparent, which previously made exports look washed-out/blank)
+      ctx.fillStyle = pitchColor;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+      canvas.toBlob(blob=>{
+        if(!blob){ showExportToast('Export failed: could not generate image (canvas may be tainted by an uploaded logo)', true); return; }
+        const filename = format==='jpeg'?'tactic-board.jpg':'tactic-board.png';
+        downloadBlob(blob, filename);
+        showExportToast('Exported '+filename);
+      }, format==='jpeg'?'image/jpeg':'image/png', 0.95);
+    } catch(e){
+      showExportToast('Export failed: '+e.message, true);
+    }
+  }).catch(e=>{
+    showExportToast('Export failed: '+e.message, true);
+  });
+ } catch(e){
+   showExportToast('Export failed: '+e.message, true);
+   console.error('Export error:', e);
+ }
+};
+
+// Records a downloadable WebM video of the full sequence — every frame
+// played in order (looping back to frame 1 at the end) using the same
+// eased, distance-scaled motion as on-screen playback. This is what makes
+// "Export > Video" produce something shareable to social media or droppable
+// into a slide deck, rather than just a single static image.
+async function exportVideo(){
+  const testCanvas = document.createElement('canvas');
+  if(typeof MediaRecorder==='undefined' || typeof testCanvas.captureStream!=='function'){
+    showExportToast('Video export is not supported in this browser', true);
+    return;
+  }
+  if(state.frames.length<2){
+    showExportToast('Add at least 2 frames to export a video', true);
+    return;
+  }
+
+  const exportBtn = document.getElementById('exportBtn');
+  const origLabel = exportBtn.textContent;
+  exportBtn.disabled = true;
+  exportBtn.textContent = '⏳ Recording…';
+
+  // Snapshot everything we're about to temporarily mutate so the live board
+  // is restored exactly as the user left it once recording finishes.
+  const savedFrames = JSON.parse(JSON.stringify(state.frames));
+  const savedCurrentFrame = state.currentFrame;
+  const savedSelectedId = state.selectedId;
+  const savedPlaying = state.playing;
+  if(playTimer){ cancelAnimationFrame(playTimer); playTimer=null; }
+  state.playing = false;
+  state.selectedId = null;
+
+  try {
+    const [,,vw,vh] = getOuterViewBox();
+    const scale = 1280/vw;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.round(vw*scale);
+    canvas.height = Math.round(vh*scale);
+    const ctx = canvas.getContext('2d');
+
+    const fps = 24;
+    const stream = canvas.captureStream(fps);
+    const mimeType = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm']
+      .find(t=>MediaRecorder.isTypeSupported(t)) || 'video/webm';
+    const recorder = new MediaRecorder(stream, {mimeType, videoBitsPerSecond: 6_000_000});
+    const chunks = [];
+    recorder.ondataavailable = e=>{ if(e.data && e.data.size) chunks.push(e.data); };
+    const stopped = new Promise(resolve=>{ recorder.onstop = resolve; });
+    recorder.start();
+
+    // Renders whatever is currently in state.frames[state.currentFrame] to
+    // the SVG, then rasterizes it onto the recording canvas.
+    async function captureCurrentFrame(){
+      render();
+      const {svgStr, pitchColor} = buildExportSVGString();
+      const img = await svgStringToImage(svgStr);
+      ctx.fillStyle = pitchColor;
+      ctx.fillRect(0,0,canvas.width,canvas.height);
+      ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    }
+
+    const n = savedFrames.length;
+    const frameInterval = 1000/fps;
+
+    for(let i=0;i<n;i++){
+      const fromIdx = i;
+      const toIdx = (i+1)%n;
+      const from = savedFrames[fromIdx];
+      const to = savedFrames[toIdx];
+
+      // Same distance-scaled duration as on-screen playback (playStep), so
+      // the recorded clip moves at the same pace the user sees live.
+      const targets = from.objects.map(o=>{
+        const t = to.objects.find(x=>x.id===o.id);
+        return {id:o.id, fx0:o.fx, fy0:o.fy, fx1: t?t.fx:o.fx, fy1: t?t.fy:o.fy};
+      });
+      const travelFrac = targets.reduce((max,a)=>Math.max(max, Math.hypot(a.fx1-a.fx0, a.fy1-a.fy0)), 0);
+      const duration = Math.max(500, Math.min(2400, travelFrac*2600)) / state.speed;
+      const steps = Math.max(1, Math.round(duration/frameInterval));
+
+      for(let s=0; s<=steps; s++){
+        const raw = s/steps;
+        const t = easeInOutCubic(raw);
+        const frame = JSON.parse(JSON.stringify(from));
+        frame.objects.forEach(o=>{
+          const a = targets.find(x=>x.id===o.id);
+          if(!a) return;
+          o.fx = a.fx0 + (a.fx1-a.fx0)*t;
+          o.fy = a.fy0 + (a.fy1-a.fy0)*t;
+        });
+        state.frames[fromIdx] = frame;
+        state.currentFrame = fromIdx;
+        await captureCurrentFrame();
+        await new Promise(r=>setTimeout(r, frameInterval));
+        showExportToast(`Recording video… frame ${i+1}/${n}`);
+      }
+    }
+
+    recorder.stop();
+    await stopped;
+    const blob = new Blob(chunks, {type:'video/webm'});
+    downloadBlob(blob, 'tactic-board.webm');
+    showExportToast('Exported tactic-board.webm');
+  } catch(e){
+    showExportToast('Video export failed: '+e.message, true);
+    console.error('Video export error:', e);
+  } finally {
+    state.frames = savedFrames;
+    state.currentFrame = savedCurrentFrame;
+    state.selectedId = savedSelectedId;
+    state.playing = savedPlaying;
+    exportBtn.disabled = false;
+    exportBtn.textContent = origLabel;
+    render();
+  }
+}
+
+// Convert a (possibly large, Unicode-containing) string to a base64 string,
+// in chunks to avoid call-stack/argument-limit issues with very large SVGs
+// (e.g. ones containing embedded logo images as data URIs).
+function utf8ToBase64(str){
+  const bytes = new TextEncoder().encode(str);
+  let binary = '';
+  const chunkSize = 0x8000;
+  for(let i=0;i<bytes.length;i+=chunkSize){
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i+chunkSize));
+  }
+  return btoa(binary);
+}
+function downloadBlob(blob, filename){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+// ---------------------------------------------------------------------
+// SESSION LIBRARY (save current play as template)
+// ---------------------------------------------------------------------
+function renderLibrary(){
+  const list = document.getElementById('libraryList');
+  list.innerHTML='';
+  if(library.length===0){ list.innerHTML = '<div class="hint">No saved templates yet.</div>'; return; }
+  library.forEach((item,i)=>{
+    const d = document.createElement('div');
+    d.className='lib-item';
+    d.innerHTML = `<strong>${item.name}</strong><div style="font-size:11px;color:var(--muted);">${item.frames.length} frame(s)</div>
+      <div class="tags">${item.tags.map(t=>`<span class="tag">${t}</span>`).join('')}</div>
+      <div style="margin-top:6px;display:flex;gap:6px;">
+        <button class="toolbtn" style="border:1px solid var(--border);" data-load="${i}">Load</button>
+        <button class="toolbtn" style="border:1px solid var(--border);" data-rm="${i}">Remove</button>
+      </div>`;
+    list.appendChild(d);
+  });
+  list.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>{
+    const item = library[b.dataset.load];
+    state.frames = JSON.parse(JSON.stringify(item.frames));
+    state.currentFrame=0; state.selectedId=null;
+    snapshot(); render();
+  });
+  list.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{
+    library.splice(b.dataset.rm,1); renderLibrary();
+  });
+}
+document.getElementById('saveTemplateBtn').onclick = ()=>{
+  const name = prompt('Template name:', 'New Tactical Scenario');
+  if(!name) return;
+  const tagOptions = ['Technical','Tactical','Physical','Psychological','Set Pieces','Possession','Pressing','Transition'];
+  const tagsInput = prompt('Tags (comma separated, choose from: '+tagOptions.join(', ')+')', 'Tactical, Possession');
+  const tags = tagsInput ? tagsInput.split(',').map(t=>t.trim()).filter(Boolean) : [];
+  library.push({name, tags, frames: JSON.parse(JSON.stringify(state.frames))});
+  renderLibrary();
+};
+
+// ---------------------------------------------------------------------
+// FIELD THEME / LINE COLOR / NO LINES UI (left sidebar)
+// ---------------------------------------------------------------------
+function renderFieldThemeUI(){
+  const grid = document.getElementById('fieldThemeGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  Object.keys(FIELD_THEMES).forEach(key=>{
+    const theme = FIELD_THEMES[key];
+    const b = document.createElement('button');
+    b.className = 'toolbtn theme-swatch field-theme-'+key+(state.fieldTheme===key?' active':'');
+    // Inline gradient so every theme (including ones without a dedicated
+    // .field-theme-* CSS class) shows an accurate color preview.
+    b.style.background = `linear-gradient(180deg, ${theme.pitch}, ${theme.pitch2})`;
+    b.title = theme.label;
+    b.textContent = theme.label;
+    b.onclick = ()=>{
+      state.fieldTheme = key;
+      applyFieldTheme();
+      renderFieldThemeUI();
+      render();
+    };
+    grid.appendChild(b);
+  });
+  const picker = document.getElementById('lineColorPicker');
+  if(picker){
+    const theme = FIELD_THEMES[state.fieldTheme] || FIELD_THEMES.grass;
+    const val = state.lineColor || theme.line;
+    if(/^#[0-9a-fA-F]{6}$/.test(val)) picker.value = val;
+  }
+  const noLinesBtn = document.getElementById('noLinesBtn');
+  if(noLinesBtn) noLinesBtn.classList.toggle('active', state.noLines);
+}
+
+function renderStripePatternUI(){
+  const grid = document.getElementById('stripePatternGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  Object.keys(STRIPE_PATTERNS).forEach(key=>{
+    const pattern = STRIPE_PATTERNS[key];
+    const b = document.createElement('button');
+    b.className = 'toolbtn theme-swatch'+((state.stripePattern||'vertical')===key?' active':'');
+    b.style.background = 'var(--panel2)';
+    b.style.color = 'var(--text)';
+    b.style.textShadow = 'none';
+    b.title = pattern.label;
+    b.textContent = pattern.label;
+    b.onclick = ()=>{
+      state.stripePattern = key;
+      renderStripePatternUI();
+      render();
+    };
+    grid.appendChild(b);
+  });
+}
+
+(function bindFieldThemeControls(){
+  const picker = document.getElementById('lineColorPicker');
+  if(picker){
+    picker.oninput = ()=>{
+      state.lineColor = picker.value;
+      applyFieldTheme();
+      render();
+    };
+  }
+  const resetBtn = document.getElementById('resetLineColorBtn');
+  if(resetBtn){
+    resetBtn.onclick = ()=>{
+      state.lineColor = null;
+      applyFieldTheme();
+      renderFieldThemeUI();
+      render();
+    };
+  }
+  const noLinesBtn = document.getElementById('noLinesBtn');
+  if(noLinesBtn){
+    noLinesBtn.onclick = ()=>{
+      state.noLines = !state.noLines;
+      renderFieldThemeUI();
+      render();
+    };
+  }
+})();
+
+// ---------------------------------------------------------------------
+// AD BANNER UI (left sidebar) — sponsor border toggle, text/image mode,
+// colors, and image upload. See state.adBanner / buildAdBannerHTML().
+// ---------------------------------------------------------------------
+function renderAdBannerUI(){
+  const ab = state.adBanner;
+  const enable = document.getElementById('adBannerEnable');
+  if(!enable) return;
+  const options = document.getElementById('adBannerOptions');
+  const modeTextBtn = document.getElementById('adBannerModeText');
+  const modeImageBtn = document.getElementById('adBannerModeImage');
+  const textOptions = document.getElementById('adBannerTextOptions');
+  const imageOptions = document.getElementById('adBannerImageOptions');
+  const textInput = document.getElementById('adBannerText');
+  const bgPicker = document.getElementById('adBannerBgColor');
+  const textPicker = document.getElementById('adBannerTextColor');
+  const textColorLabel = document.getElementById('adBannerTextColorLabel');
+  const imgThumb = document.getElementById('adBannerImageThumb');
+  const imgRemove = document.getElementById('adBannerImageRemove');
+
+  enable.checked = !!ab.enabled;
+  options.style.display = ab.enabled ? '' : 'none';
+  modeTextBtn.classList.toggle('active', ab.mode==='text');
+  modeImageBtn.classList.toggle('active', ab.mode==='image');
+  textOptions.style.display = ab.mode==='text' ? '' : 'none';
+  imageOptions.style.display = ab.mode==='image' ? '' : 'none';
+  if(document.activeElement!==textInput) textInput.value = ab.text || '';
+  bgPicker.value = /^#[0-9a-fA-F]{6}$/.test(ab.bgColor||'') ? ab.bgColor : '#0d1b2a';
+  textPicker.value = /^#[0-9a-fA-F]{6}$/.test(ab.textColor||'') ? ab.textColor : '#ffffff';
+  const showTextColor = ab.mode==='text';
+  textPicker.style.display = showTextColor ? '' : 'none';
+  textColorLabel.style.display = showTextColor ? '' : 'none';
+
+  if(ab.image){
+    imgThumb.classList.remove('empty');
+    imgThumb.textContent = '';
+    imgThumb.style.backgroundImage = `url(${ab.image})`;
+    imgThumb.style.backgroundSize = 'cover';
+    imgThumb.style.backgroundPosition = 'center';
+    imgRemove.style.display = '';
+  } else {
+    imgThumb.classList.add('empty');
+    imgThumb.textContent = '🖼';
+    imgThumb.style.backgroundImage = '';
+    imgRemove.style.display = 'none';
+  }
+}
+
+(function bindAdBannerControls(){
+  const enable = document.getElementById('adBannerEnable');
+  if(!enable) return;
+  const ab = state.adBanner;
+
+  enable.onchange = ()=>{
+    ab.enabled = enable.checked;
+    renderAdBannerUI();
+    render();
+  };
+
+  document.getElementById('adBannerModeText').onclick = ()=>{
+    ab.mode = 'text';
+    renderAdBannerUI();
+    render();
+  };
+  document.getElementById('adBannerModeImage').onclick = ()=>{
+    ab.mode = 'image';
+    renderAdBannerUI();
+    render();
+  };
+
+  const textInput = document.getElementById('adBannerText');
+  textInput.oninput = ()=>{
+    ab.text = textInput.value;
+    render();
+  };
+
+  document.getElementById('adBannerBgColor').oninput = (e)=>{
+    ab.bgColor = e.target.value;
+    render();
+  };
+  document.getElementById('adBannerTextColor').oninput = (e)=>{
+    ab.textColor = e.target.value;
+    render();
+  };
+
+  const imageInput = document.getElementById('adBannerImageInput');
+  imageInput.onchange = ()=>{
+    const file = imageInput.files && imageInput.files[0];
+    readFileAsDataURL(file, dataUrl=>{
+      ab.image = dataUrl;
+      renderAdBannerUI();
+      render();
+    });
+  };
+  document.getElementById('adBannerImageRemove').onclick = ()=>{
+    ab.image = null;
+    renderAdBannerUI();
+    render();
+  };
+})();
+
+// ---------------------------------------------------------------------
+// THICKNESS UI (left sidebar default)
+// ---------------------------------------------------------------------
+function renderThicknessUI(){
+  const grid = document.getElementById('thicknessGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+  const current = thicknessId(state.strokeThickness);
+  THICKNESS_PRESETS.forEach(p=>{
+    const b = document.createElement('button');
+    b.className = 'toolbtn'+(current===p.id?' active':'');
+    b.innerHTML = `<span class="thickness-bar" style="background:${current===p.id?'#08210f':'var(--text)'}"></span>${p.label}`;
+    b.onclick = ()=>{
+      state.strokeThickness = p.value;
+      renderThicknessUI();
+      updatePropsPanel();
+    };
+    grid.appendChild(b);
+  });
+}
+
+// ---------------------------------------------------------------------
+// TEAM COLORS UI (left sidebar)
+// HOME (Team A) / AWAY (Team B), each with Jersey, Number Color, GK
+// Jersey, and GK Number color pickers, plus a club logo upload ("Customize
+// Jersey") used inside player circle markers. A separate Field Logo upload
+// places a watermark badge under the pitch markings.
+// ---------------------------------------------------------------------
+function readFileAsDataURL(file, cb){
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=> cb(reader.result);
+  reader.readAsDataURL(file);
+}
+
+// Builds a labeled range-slider row (e.g. "Size 32%") that calls onInput
+// with the slider's numeric value as the user drags it.
+function makeSliderRow(label, value, min, max, step, fmt, onInput){
+  const row = document.createElement('div');
+  row.className = 'logo-slider-row';
+  const head = document.createElement('div');
+  head.className = 'slider-head';
+  const labelEl = document.createElement('span');
+  labelEl.textContent = label;
+  const valueEl = document.createElement('span');
+  valueEl.textContent = fmt(value);
+  head.appendChild(labelEl);
+  head.appendChild(valueEl);
+  row.appendChild(head);
+  const slider = document.createElement('input');
+  slider.type = 'range';
+  slider.min = min; slider.max = max; slider.step = step; slider.value = value;
+  slider.oninput = ()=>{
+    const v = parseFloat(slider.value);
+    valueEl.textContent = fmt(v);
+    onInput(v);
+  };
+  row.appendChild(slider);
+  return row;
+}
+
+function renderTeamColorsUI(){
+  const grid = document.getElementById('teamColorsGrid');
+  if(!grid) return;
+  grid.innerHTML = '';
+
+  const sides = [
+    {key:'A', label:'Home'},
+    {key:'B', label:'Away'},
+  ];
+  const fieldRows = [
+    {field:'jersey', label:'Jersey', cssVar: t=>TEAM_COLOR_CSS_VARS[t].jersey},
+    {field:'number', label:'Number Color', cssVar: t=>TEAM_COLOR_CSS_VARS[t].number},
+    {field:'gk', label:'🧤 Goalkeeper', cssVar: t=>TEAM_COLOR_CSS_VARS[t].gk},
+    {field:'gkNumber', label:'🧤 GK Number', cssVar: t=>TEAM_COLOR_CSS_VARS[t].gkNumber},
+  ];
+
+  sides.forEach(side=>{
+    const heading = document.createElement('div');
+    heading.className = 'team-side-label';
+    heading.textContent = side.label;
+    grid.appendChild(heading);
+
+    fieldRows.forEach(fr=>{
+      const row = document.createElement('div');
+      row.className = 'team-color-row';
+      const cssVar = fr.cssVar(side.key);
+      const computed = getComputedStyle(document.body).getPropertyValue(cssVar).trim();
+      const current = (state.teamColors[side.key] && state.teamColors[side.key][fr.field]) || computed;
+      const label = document.createElement('span');
+      label.textContent = fr.label;
+      row.appendChild(label);
+      const picker = document.createElement('input');
+      picker.type = 'color';
+      picker.className = 'swatch-custom';
+      picker.value = /^#[0-9a-fA-F]{6}$/.test(current) ? current : '#ffffff';
+      picker.oninput = ()=>{ state.teamColors[side.key][fr.field]=picker.value; applyTeamColors(); render(); };
+      row.appendChild(picker);
+      const resetBtn = document.createElement('button');
+      resetBtn.className = 'toolbtn';
+      resetBtn.style.border = '1px solid var(--border)';
+      resetBtn.title = 'Reset to theme default';
+      resetBtn.textContent = '↺';
+      resetBtn.onclick = ()=>{ state.teamColors[side.key][fr.field]=null; applyTeamColors(); renderTeamColorsUI(); render(); };
+      row.appendChild(resetBtn);
+      grid.appendChild(row);
+    });
+
+    // Club logo upload — "Customize Jersey": shows inside player circles.
+    const logoRow = document.createElement('div');
+    logoRow.className = 'team-logo-row';
+    const thumb = document.createElement(state.teamLogos[side.key] ? 'img' : 'div');
+    thumb.className = 'logo-thumb' + (state.teamLogos[side.key] ? '' : ' empty');
+    if(state.teamLogos[side.key]) thumb.src = state.teamLogos[side.key];
+    else thumb.textContent = '🔰';
+    logoRow.appendChild(thumb);
+    const uploadLabel = document.createElement('label');
+    uploadLabel.className = 'upload-btn';
+    uploadLabel.textContent = '(⚿) Customize Jersey';
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.accept = 'image/*';
+    fileInput.onchange = ()=>{
+      const file = fileInput.files && fileInput.files[0];
+      readFileAsDataURL(file, dataUrl=>{
+        state.teamLogos[side.key] = dataUrl;
+        renderTeamColorsUI();
+        render();
+      });
+    };
+    uploadLabel.appendChild(fileInput);
+    logoRow.appendChild(uploadLabel);
+    if(state.teamLogos[side.key]){
+      const removeBtn = document.createElement('button');
+      removeBtn.className = 'toolbtn';
+      removeBtn.style.border = '1px solid var(--border)';
+      removeBtn.title = 'Remove jersey logo';
+      removeBtn.textContent = '✕';
+      removeBtn.onclick = ()=>{ state.teamLogos[side.key]=null; renderTeamColorsUI(); render(); };
+      logoRow.appendChild(removeBtn);
+    }
+    grid.appendChild(logoRow);
+  });
+
+  // Jersey logo opacity — applies to both teams' player-circle badges.
+  grid.appendChild(makeSliderRow(
+    'Jersey Logo Opacity', state.playerLogoOpacity, 0, 1, 0.05,
+    v=>`${Math.round(v*100)}%`,
+    v=>{ state.playerLogoOpacity = v; render(); }
+  ));
+
+  // Field Images — one or more watermarks beneath the pitch markings, each
+  // independently positioned/sized/styled and lockable in place.
+  const divider = document.createElement('hr');
+  divider.className = 'team-color-divider';
+  grid.appendChild(divider);
+
+  const fieldHeading = document.createElement('div');
+  fieldHeading.className = 'team-side-label';
+  fieldHeading.textContent = 'Field Images';
+  grid.appendChild(fieldHeading);
+
+  (state.fieldImages||[]).forEach(img=>{
+    const row = document.createElement('div');
+    row.className = 'team-logo-row';
+    const thumb = document.createElement('img');
+    thumb.className = 'logo-thumb';
+    thumb.src = img.src;
+    row.appendChild(thumb);
+
+    const lockBtn = document.createElement('button');
+    lockBtn.className = 'toolbtn';
+    lockBtn.style.border = '1px solid var(--border)';
+    lockBtn.classList.toggle('active', !!img.locked);
+    lockBtn.title = img.locked ? 'Locked — click to allow dragging' : 'Unlocked — click to lock in place';
+    lockBtn.textContent = img.locked ? '🔒' : '🔓';
+    lockBtn.onclick = ()=>{ img.locked = !img.locked; renderTeamColorsUI(); render(); };
+    row.appendChild(lockBtn);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'toolbtn';
+    removeBtn.style.border = '1px solid var(--border)';
+    removeBtn.title = 'Remove image';
+    removeBtn.textContent = '✕';
+    removeBtn.onclick = ()=>{ state.fieldImages = state.fieldImages.filter(f=>f.id!==img.id); renderTeamColorsUI(); render(); };
+    row.appendChild(removeBtn);
+
+    grid.appendChild(row);
+
+    grid.appendChild(makeSliderRow(
+      'Size', img.size, 0.1, 0.8, 0.01,
+      v=>`${Math.round(v*100)}%`,
+      v=>{ img.size = v; render(); }
+    ));
+    grid.appendChild(makeSliderRow(
+      'Opacity', img.opacity, 0, 1, 0.05,
+      v=>`${Math.round(v*100)}%`,
+      v=>{ img.opacity = v; render(); }
+    ));
+
+    const posBtn = document.createElement('button');
+    posBtn.className = 'toolbtn';
+    posBtn.style.border = '1px solid var(--border)';
+    posBtn.style.width = '100%';
+    posBtn.style.marginTop = '4px';
+    posBtn.style.marginBottom = '8px';
+    posBtn.textContent = '↺ Reset Position';
+    posBtn.title = 'Center this image on the pitch';
+    posBtn.onclick = ()=>{ img.x=0.5; img.y=0.5; render(); };
+    grid.appendChild(posBtn);
+  });
+
+  const addRow = document.createElement('div');
+  addRow.className = 'team-logo-row';
+  const addThumb = document.createElement('div');
+  addThumb.className = 'logo-thumb empty';
+  addThumb.textContent = '🖼';
+  addRow.appendChild(addThumb);
+  const addLabel = document.createElement('label');
+  addLabel.className = 'upload-btn';
+  addLabel.textContent = '+ Add Field Image';
+  const addInput = document.createElement('input');
+  addInput.type = 'file';
+  addInput.accept = 'image/*';
+  addInput.onchange = ()=>{
+    const file = addInput.files && addInput.files[0];
+    readFileAsDataURL(file, dataUrl=>{
+      state.fieldImages = state.fieldImages || [];
+      state.fieldImages.push({
+        id: 'fimg'+Math.random().toString(36).slice(2,9),
+        src: dataUrl, x: 0.5, y: 0.5, size: 0.32, opacity: 0.28, locked: false
+      });
+      renderTeamColorsUI();
+      render();
+    });
+  };
+  addLabel.appendChild(addInput);
+  addRow.appendChild(addLabel);
+  grid.appendChild(addRow);
+
+  const hint = document.createElement('div');
+  hint.className = 'hint';
+  hint.style.marginTop = '6px';
+  hint.textContent = 'Jersey logos appear inside player circles for that team. Field images appear as watermarks under the pitch markings — with the Select tool, drag to reposition (🔓), or lock (🔒) to prevent moving. Add as many as you like.';
+  grid.appendChild(hint);
+}
+
+// ---------------------------------------------------------------------
+// FORMATION PRESETS (right sidebar)
+// Positions are fractions for a HORIZONTAL FULL FIELD viewed left-to-right,
+// with Team A (Home) attacking towards x=1. Team B (Away) mirrors x so both
+// sides face each other. For vertical orientation, coordinates are
+// transformed via fx_new = fy_old, fy_new = 1 - fx_old (matches the
+// horizontal->vertical pitch transform used elsewhere).
+// ---------------------------------------------------------------------
+const FORMATIONS = {
+  '4-4-2': [
+    {x:0.06,y:0.50,gk:true},
+    {x:0.20,y:0.14},{x:0.20,y:0.38},{x:0.20,y:0.62},{x:0.20,y:0.86},
+    {x:0.46,y:0.14},{x:0.46,y:0.38},{x:0.46,y:0.62},{x:0.46,y:0.86},
+    {x:0.76,y:0.36},{x:0.76,y:0.64},
+  ],
+  '4-3-3': [
+    {x:0.06,y:0.50,gk:true},
+    {x:0.20,y:0.14},{x:0.20,y:0.38},{x:0.20,y:0.62},{x:0.20,y:0.86},
+    {x:0.46,y:0.26},{x:0.46,y:0.50},{x:0.46,y:0.74},
+    {x:0.78,y:0.14},{x:0.78,y:0.50},{x:0.78,y:0.86},
+  ],
+  '4-2-3-1': [
+    {x:0.06,y:0.50,gk:true},
+    {x:0.20,y:0.14},{x:0.20,y:0.38},{x:0.20,y:0.62},{x:0.20,y:0.86},
+    {x:0.40,y:0.36},{x:0.40,y:0.64},
+    {x:0.62,y:0.14},{x:0.62,y:0.50},{x:0.62,y:0.86},
+    {x:0.86,y:0.50},
+  ],
+  '3-5-2': [
+    {x:0.06,y:0.50,gk:true},
+    {x:0.20,y:0.26},{x:0.20,y:0.50},{x:0.20,y:0.74},
+    {x:0.46,y:0.08},{x:0.46,y:0.30},{x:0.46,y:0.50},{x:0.46,y:0.70},{x:0.46,y:0.92},
+    {x:0.78,y:0.36},{x:0.78,y:0.64},
+  ],
+  '5-3-2': [
+    {x:0.06,y:0.50,gk:true},
+    {x:0.18,y:0.08},{x:0.18,y:0.29},{x:0.18,y:0.50},{x:0.18,y:0.71},{x:0.18,y:0.92},
+    {x:0.46,y:0.26},{x:0.46,y:0.50},{x:0.46,y:0.74},
+    {x:0.78,y:0.36},{x:0.78,y:0.64},
+  ],
+};
+
+function applyFormation(team, key){
+  const layout = FORMATIONS[key];
+  if(!layout) return;
+  const frame = currentFrame();
+  frame.objects = frame.objects.filter(o=>!(o.type==='player' && o.team===team));
+  layout.forEach((p,idx)=>{
+    let fx = team==='B' ? 1 - p.x : p.x;
+    let fy = p.y;
+    if(state.orientation==='vertical'){
+      const nfx = fy, nfy = 1 - fx;
+      fx = nfx; fy = nfy;
+    }
+    const obj = makeObject('player', {team, number: idx+1, gk: !!p.gk, fx, fy});
+    frame.objects.push(obj);
+  });
+  if(team==='A') teamACounter = 12; else teamBCounter = 12;
+  snapshot();
+  render();
+}
+
+function renderFormationUI(){
+  ['A','B'].forEach(team=>{
+    const grid = document.getElementById(team==='A' ? 'formationHomeGrid' : 'formationAwayGrid');
+    if(!grid) return;
+    grid.innerHTML = '';
+    Object.keys(FORMATIONS).forEach(key=>{
+      const b = document.createElement('button');
+      b.className = 'toolbtn';
+      b.style.border = '1px solid var(--border)';
+      b.textContent = key;
+      b.onclick = ()=>applyFormation(team, key);
+      grid.appendChild(b);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------
+// INIT
+// ---------------------------------------------------------------------
+applyFieldTheme();
+applyTeamColors();
+renderFieldThemeUI();
+renderStripePatternUI();
+renderThicknessUI();
+renderTeamColorsUI();
+renderAdBannerUI();
+renderFormationUI();
+renderPalette();
+snapshot();
+render();
+</script>
+</body>
+</html>
